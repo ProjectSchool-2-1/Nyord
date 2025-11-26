@@ -1,0 +1,10 @@
+{
+  "name": "nyord-root",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "cd frontend && npm run dev",
+    "start-frontend": "cd frontend && npm run dev",
+    "install-frontend": "cd frontend && npm install"
+  }
+}

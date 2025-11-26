@@ -1,10 +1,46 @@
 import { Link } from 'react-router-dom';
+import ScrollExpandMedia from '../components/ScrollExpandMedia';
+import XapoStyleScroll from '../components/XapoStyleScroll';
 
 const LandingPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
-      {/* Hero Section */}
-      <div className="relative overflow-hidden">
+      {/* Scroll Expand Media Hero Section */}
+      <ScrollExpandMedia
+        title="Banking Made Simple"
+        date="2024"
+        scrollToExpand="Scroll to explore our features"
+        textBlend={false}
+      >
+        {/* Content that appears after scroll expansion */}
+        <div className="text-center text-white space-y-6">
+          <h3 className="text-3xl font-bold">Experience Modern Banking</h3>
+          <p className="text-xl opacity-90 max-w-2xl mx-auto">
+            Join over 1 million customers who trust Nyord for seamless digital banking, instant transfers, and smart financial tools.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
+            <Link
+              to="/signup"
+              className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-orange-600 to-orange-700 rounded-xl hover:from-orange-700 hover:to-orange-800 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+            >
+              Open Account
+              <span className="ml-2">→</span>
+            </Link>
+            <Link
+              to="/signin"
+              className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-white bg-white/10 backdrop-blur-sm rounded-xl hover:bg-white/20 transition-all border-2 border-white/20"
+            >
+              Sign In
+            </Link>
+          </div>
+        </div>
+      </ScrollExpandMedia>
+
+      {/* Xapo-Style Scroll Section */}
+      <XapoStyleScroll />
+
+      {/* Original Hero Section - Keep as fallback/alternative */}
+      <div className="relative overflow-hidden hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             {/* Left Content */}
@@ -76,7 +112,7 @@ const LandingPage = () => {
       </div>
 
       {/* Features Section */}
-      <div className="py-20 bg-white dark:bg-gray-900">
+      <div className="py-20 bg-white dark:bg-gray-900 relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">Everything you need</h2>
