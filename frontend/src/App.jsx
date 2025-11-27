@@ -13,6 +13,7 @@ import Loans from './pages/Loans';
 import FixedDeposits from './pages/FixedDeposits';
 import Profile from './pages/Profile';
 import Help from './pages/Help';
+import Transfer from './pages/Transfer';
 
 function App() {
   return (
@@ -55,6 +56,11 @@ function App() {
             <Route path="/profile" element={
               <ProtectedRoute>
                 <Profile />
+              </ProtectedRoute>
+            } />
+            <Route path="/transfer" element={
+              <ProtectedRoute>
+                <Transfer />
               </ProtectedRoute>
             } />
             <Route path="/help" element={

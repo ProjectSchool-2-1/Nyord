@@ -29,6 +29,7 @@ class Account(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     account_number = Column(String, unique=True, index=True)
+    account_type = Column(String, default="savings")  # 'savings' or 'current'
     balance = Column(Float, default=0.0)
     user_id = Column(Integer, ForeignKey("users.id"))
 

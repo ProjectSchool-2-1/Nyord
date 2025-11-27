@@ -11,6 +11,7 @@ class UserCreate(BaseModel):
     phone: Optional[str] = None
     date_of_birth: Optional[date] = None
     address: Optional[str] = None
+    account_type: str = "savings"  # 'savings' or 'current'
 
 class UserLogin(BaseModel):
     username: str
@@ -48,6 +49,7 @@ class AccountCreate(BaseModel):
 class AccountOut(BaseModel):
     id: int
     account_number: str
+    account_type: str
     balance: float
 
     class Config:

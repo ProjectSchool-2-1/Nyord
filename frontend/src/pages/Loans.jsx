@@ -17,6 +17,7 @@ const Loans = () => {
 
   const [loans, setLoans] = useState([]);
   const [applyLoading, setApplyLoading] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [payLoading, setPayLoading] = useState(false);
   const [selectedLoanId, setSelectedLoanId] = useState(null);
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -50,30 +51,42 @@ const Loans = () => {
       try {
         const event = JSON.parse(msg.data);
         if (event.type === 'loan.created') {
-          // New loan appended
-          setLoans((prev) => {
-            if (prev.find((l) => l.id === event.loan_id)) return prev;
+          setLoans(prev => {
+            const existing = prev.find(l => l.id === event.loan_id);
+            if (existing) {
+              // Merge minimal event data (keep richer fields from existing)
+              return prev.map(l => l.id === event.loan_id ? { ...l, emi: event.emi, outstanding: event.outstanding, status: 'ACTIVE' } : l);
+            }
+            // Insert placeholder; will be upgraded by apply response if already in progress
             return [
               ...prev,
               {
                 id: event.loan_id,
                 user_id: event.user_id,
+                loan_type: 'Home',
                 principal: event.principal,
+                rate: interestRate,
+                tenure_months: loanTenure * 12,
                 emi: event.emi,
+                total_payable: event.outstanding,
+                amount_paid: 0,
                 outstanding: event.outstanding,
-                status: 'ACTIVE',
-              },
+                start_date: new Date().toISOString().slice(0,10),
+                status: 'ACTIVE'
+              }
             ];
           });
         } else if (event.type === 'loan.payment') {
-          setLoans((prev) => prev.map((l) => (
+          setLoans(prev => prev.map(l => (
             l.id === event.loan_id
               ? { ...l, outstanding: event.outstanding, status: event.status }
               : l
           )));
         }
-      } catch {}
-    };
+      } catch {
+        // ignore malformed
+      }
+    };    
     return () => ws.close();
   }, []);
 
@@ -90,11 +103,18 @@ const Loans = () => {
         start_date: startDate.toISOString().slice(0, 10),
       };
       const created = await loansAPI.applyLoan(payload);
-      setLoans((prev) => [...prev, created]);
+      setLoans(prev => {
+        const existing = prev.find(l => l.id === created.id);
+        if (existing) {
+          return prev.map(l => l.id === created.id ? { ...existing, ...created } : l);
+        }
+        return [...prev, created];
+      });
     } catch (e) {
       console.error('Apply failed', e);
     } finally {
       setApplyLoading(false);
+      setShowConfirm(false);
     }
   };
 
@@ -281,36 +301,17 @@ const Loans = () => {
                     Total Interest: ${((calculateEMI() * loanTenure * 12) - loanAmount).toFixed(2)}
                   </div>
                 </div>
-                <div className="mt-4">
-                  <button onClick={handleApply} disabled={applyLoading} className="w-full bg-white text-blue-600 py-3 rounded-xl font-semibold hover:bg-gray-100 transition-all disabled:opacity-60">
-                    {applyLoading ? 'Applying…' : 'Apply for Loan'}
-                  </button>
-                </div>
               </div>
             </div>
-
-            {/* Loan Types */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Available Loan Types</h2>
-              
-              <div className="grid sm:grid-cols-3 gap-4">
-                {[
-                  { icon: 'home', name: 'Home Loan', rate: '6.5% - 8.5%', tenure: 'Up to 30 years', color: 'blue' },
-                  { icon: 'person', name: 'Personal Loan', rate: '10% - 15%', tenure: 'Up to 5 years', color: 'purple' },
-                  { icon: 'directions_car', name: 'Auto Loan', rate: '7% - 12%', tenure: 'Up to 7 years', color: 'green' },
-                ].map((loan, idx) => (
-                  <div key={idx} className={`p-6 rounded-xl bg-${loan.color}-50 dark:bg-${loan.color}-900/20 hover:shadow-lg transition-all cursor-pointer`}>
-                    <div className={`w-12 h-12 bg-${loan.color}-600 rounded-xl flex items-center justify-center mb-4`}>
-                      <span className="material-symbols-outlined text-white text-2xl">{loan.icon}</span>
-                    </div>
-                    <h3 className="font-bold text-gray-900 dark:text-white mb-2">{loan.name}</h3>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      <div className="mb-1">Rate: {loan.rate}</div>
-                      <div>Tenure: {loan.tenure}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            {/* Apply Button moved outside calculator with confirmation */}
+            <div>
+              <button
+                onClick={() => setShowConfirm(true)}
+                disabled={applyLoading}
+                className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-all disabled:opacity-60"
+              >
+                {applyLoading ? 'Processing…' : 'Apply for Loan'}
+              </button>
             </div>
           </div>
 
@@ -324,7 +325,7 @@ const Loans = () => {
                   <div key={idx} className="p-4 rounded-xl bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer">
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        <h3 className="font-bold text-gray-900 dark:text-white">{loan.loan_type || 'Loan'}</h3>
+                        <h3 className="font-bold text-gray-900 dark:text-white">{`Loan ${idx + 1}`}</h3>
                         <div className="text-sm text-gray-500 dark:text-gray-400">{loan.account_ref || '—'}</div>
                       </div>
                       <span className="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">
@@ -375,6 +376,37 @@ const Loans = () => {
           </div>
         </div>
       </div>
+      {showConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-2xl p-6 shadow-xl">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Confirm Loan Application</h3>
+            <div className="space-y-2 text-sm text-gray-700 dark:text-gray-300 mb-4">
+              <div className="flex justify-between"><span>Loan Amount:</span><span className="font-semibold">${loanAmount.toLocaleString()}</span></div>
+              <div className="flex justify-between"><span>Tenure:</span><span className="font-semibold">{loanTenure} years ({loanTenure * 12} months)</span></div>
+              <div className="flex justify-between"><span>Interest Rate:</span><span className="font-semibold">{interestRate}%</span></div>
+              <div className="flex justify-between"><span>Monthly EMI:</span><span className="font-semibold">${calculateEMI()}</span></div>
+              <div className="flex justify-between"><span>Total Interest:</span><span className="font-semibold">${((calculateEMI() * loanTenure * 12) - loanAmount).toFixed(2)}</span></div>
+              <div className="flex justify-between"><span>Total Payable:</span><span className="font-semibold">${(calculateEMI() * loanTenure * 12).toFixed(2)}</span></div>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">By confirming, you acknowledge the repayment schedule and EMI obligations for the selected tenure.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowConfirm(false)}
+                className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 py-2 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleApply}
+                disabled={applyLoading}
+                className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition-all disabled:opacity-60"
+              >
+                {applyLoading ? 'Applying…' : 'Confirm & Apply'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

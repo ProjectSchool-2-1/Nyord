@@ -8,7 +8,7 @@ const LandingPage = () => {
       {/* Scroll Expand Media Hero Section */}
       <ScrollExpandMedia
         title="Banking Made Simple"
-        date="2024"
+        date="2025"
         scrollToExpand="Scroll to explore our features"
         textBlend={false}
       >
@@ -237,7 +237,7 @@ const LandingPage = () => {
           </div>
           
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm">
-            © 2024 Nyord Banking. All rights reserved.
+            © 2025 Nyord Banking. All rights reserved.
           </div>
         </div>
       </footer>

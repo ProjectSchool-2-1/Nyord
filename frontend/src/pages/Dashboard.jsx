@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { dashboardAPI } from '../services/api';
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -157,13 +159,13 @@ const Dashboard = () => {
                     <div key={account.id} className="flex items-center justify-between p-4 rounded-xl bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer">
                       <div className="flex items-center space-x-4">
                         <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                          account.type === 'savings' ? 'bg-blue-100 dark:bg-blue-900/30' :
-                          account.type === 'current' ? 'bg-green-100 dark:bg-green-900/30' :
+                          account.account_type === 'savings' ? 'bg-blue-100 dark:bg-blue-900/30' :
+                          account.account_type === 'current' ? 'bg-green-100 dark:bg-green-900/30' :
                           'bg-purple-100 dark:bg-purple-900/30'
                         }`}>
                           <span className={`material-symbols-outlined ${
-                            account.type === 'savings' ? 'text-blue-600 dark:text-blue-400' :
-                            account.type === 'current' ? 'text-green-600 dark:text-green-400' :
+                            account.account_type === 'savings' ? 'text-blue-600 dark:text-blue-400' :
+                            account.account_type === 'current' ? 'text-green-600 dark:text-green-400' :
                             'text-purple-600 dark:text-purple-400'
                           }`}>
                             account_balance
@@ -171,10 +173,10 @@ const Dashboard = () => {
                         </div>
                         <div>
                           <div className="font-semibold text-gray-900 dark:text-white">
-                            {account.type === 'savings' ? 'Savings Account' : 
-                             account.type === 'current' ? 'Current Account' : 'Account'}
+                            {account.account_type === 'savings' ? 'Savings Account' : 
+                             account.account_type === 'current' ? 'Current Account' : 'Account'}
                           </div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">****{account.account_number.slice(-4)}</div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">{account.account_number}</div>
                         </div>
                       </div>
                       <div className={`text-xl font-bold ${account.balance >= 0 ? 'text-gray-900 dark:text-white' : 'text-red-600 dark:text-red-400'}`}>
@@ -244,14 +246,13 @@ const Dashboard = () => {
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Quick Actions</h2>
               <div className="space-y-3">
-                <button className="w-full flex items-center space-x-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors">
+                <button 
+                  onClick={() => navigate('/transfer')}
+                  className="w-full flex items-center space-x-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors">
                   <span className="material-symbols-outlined text-blue-600 dark:text-blue-400">send</span>
-                  <span className="font-medium text-gray-900 dark:text-white">Send Money</span>
+                  <span className="font-medium text-gray-900 dark:text-white">Transfer Money</span>
                 </button>
-                <button className="w-full flex items-center space-x-3 p-3 rounded-lg bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors">
-                  <span className="material-symbols-outlined text-green-600 dark:text-green-400">add_circle</span>
-                  <span className="font-medium text-gray-900 dark:text-white">Request Money</span>
-                </button>
+             
                 <button className="w-full flex items-center space-x-3 p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors">
                   <span className="material-symbols-outlined text-purple-600 dark:text-purple-400">credit_card</span>
                   <span className="font-medium text-gray-900 dark:text-white">Pay Bills</span>

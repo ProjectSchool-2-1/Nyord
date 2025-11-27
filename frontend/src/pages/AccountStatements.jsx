@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { jsPDF } from 'jspdf';
 import { transactionsAPI, accountsAPI } from '../services/api';
 
 const AccountStatements = () => {
@@ -61,6 +62,34 @@ const AccountStatements = () => {
       return txnDate >= startDate;
     });
   }, [rawTransactions, selectedPeriod]);
+
+  // Derive period start/end strings
+  const periodRange = useMemo(() => {
+    const now = new Date();
+    let start;
+    switch (selectedPeriod) {
+      case 'thisMonth':
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+      case 'lastMonth':
+        start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        break;
+      case 'last3Months':
+        start = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+        break;
+      case 'last6Months':
+        start = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+        break;
+      case 'thisYear':
+        start = new Date(now.getFullYear(), 0, 1);
+        break;
+      default:
+        start = new Date(0);
+    }
+    const end = now;
+    const fmt = (d) => d.toISOString().slice(0, 10);
+    return { start: fmt(start), end: fmt(end) };
+  }, [selectedPeriod]);
 
   // Compute summary stats
   const summary = useMemo(() => {
@@ -131,6 +160,88 @@ const AccountStatements = () => {
 
   const displayTransactions = enrichedTransactions;
 
+  const formatINR = (n) => `₹ ${(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const downloadPdf = () => {
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    let y = 40;
+    const line = (text = '', size = 12) => { doc.setFontSize(size); doc.text(String(text), 40, y); y += 18; };
+    const sep = () => { line('-------------------------------------', 12); };
+    const center = (text, size = 14) => {
+      doc.setFontSize(size);
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const textWidth = doc.getTextWidth(text);
+      doc.text(text, (pageWidth - textWidth) / 2, y);
+      y += 18;
+    };
+
+    // Header
+    line('=============================', 12);
+    center('NYORD BANK', 18);
+    center('ACCOUNT STATEMENT', 16);
+    line('=============================', 12);
+    y += 4;
+    line(`Generated On: ${new Date().toLocaleString()}`);
+    y += 8;
+
+    // Customer details
+    sep();
+    center('CUSTOMER DETAILS', 14); y += 4;
+    sep();
+    const primaryAcc = accounts[0];
+    const name = 'Customer'; // Could be enhanced to fetch user profile name
+    line(`Name: ${name}`);
+    line(`Account Number: ${primaryAcc ? primaryAcc.account_number : '—'}`);
+    line(`Account Type: ${primaryAcc ? (primaryAcc.account_type || '—') : '—'}`);
+    line(`Statement Period: ${periodRange.start} to ${periodRange.end}`);
+    y += 8;
+
+    // Summary
+    sep();
+    center('SUMMARY', 14); y += 4;
+    sep();
+    line(`Opening Balance : ${formatINR(summary.opening)}`);
+    line(`Total Credits   : ${formatINR(summary.credits)}`);
+    line(`Total Debits    : ${formatINR(summary.debits)}`);
+    line(`Closing Balance : ${formatINR(summary.closing)}`);
+    y += 8;
+
+    // Transaction history header
+    sep();
+    center('TRANSACTION HISTORY', 14); y += 4;
+    sep();
+    line('Date        | Description          | Type    | Amount   | Balance');
+    line('--------------------------------------------------------------------');
+
+    // Transactions rows (truncate if needed)
+    displayTransactions.forEach(txn => {
+      const date = new Date(txn.timestamp).toISOString().slice(0, 10);
+      const desc = (txn.description || '').slice(0, 20).padEnd(20, ' ');
+      const type = (txn.type || '').toUpperCase().padEnd(7, ' ');
+      const amount = formatINR(Math.abs(txn.amount)).padStart(12, ' ');
+      const bal = formatINR(txn.balance).padStart(12, ' ');
+      line(`${date}  | ${desc} | ${type} | ${amount} | ${bal}`);
+      if (y > 760) { doc.addPage(); y = 40; }
+    });
+    y += 8;
+
+    // Notes
+    sep();
+    center('NOTES', 14); y += 4;
+    sep();
+    line('• This is a system-generated statement.');
+    line('• For support, contact support@nyordbank.com.');
+    y += 12;
+
+    // Footer
+    line('=============================', 12);
+    center(`NYORD BANK • ${new Date().getFullYear()}`, 12);
+    center('Secure • Smart • Seamless', 12);
+    line('=============================', 12);
+
+    doc.save('nyord-account-statement.pdf');
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -161,7 +272,7 @@ const AccountStatements = () => {
             </div>
 
             <div className="flex items-end">
-              <button className="w-full inline-flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-all">
+              <button onClick={downloadPdf} className="w-full inline-flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-all">
                 <span className="material-symbols-outlined mr-2">download</span>
                 Download PDF
               </button>

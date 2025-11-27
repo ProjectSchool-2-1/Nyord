@@ -10,6 +10,7 @@ const SignUp = () => {
     email: '',
     password: '',
     confirmPassword: '',
+    account_type: 'savings',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -89,6 +90,24 @@ const SignUp = () => {
                   placeholder="john@example.com"
                   required
                 />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Account Type
+              </label>
+              <div className="relative">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">account_balance</span>
+                <select
+                  value={formData.account_type}
+                  onChange={(e) => setFormData({ ...formData, account_type: e.target.value })}
+                  className="w-full pl-11 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  required
+                >
+                  <option value="savings">Savings Account</option>
+                  <option value="current">Current Account</option>
+                </select>
               </div>
             </div>
 

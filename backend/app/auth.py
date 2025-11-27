@@ -2,6 +2,7 @@ from fastapi import HTTPException, Depends
 from sqlalchemy.orm import Session
 from . import models, utils
 from .database import get_db
+import random
 
 # Testing endpoints:
 #  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJleHAiOjE3NjM3MjIxNDB9.hp892mtm3CAo3yT9LYc7benh5Pkpw0jgV749mcJYCyA
@@ -29,6 +30,21 @@ def register_user(user_data, db: Session):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    
+    # Create default account with 16-digit account number
+    account_number = ''.join([str(random.randint(0, 9)) for _ in range(16)])
+    account_type = user_data.account_type if hasattr(user_data, 'account_type') and user_data.account_type in ['savings', 'current'] else 'savings'
+    
+    new_account = models.Account(
+        account_number=account_number,
+        account_type=account_type,
+        balance=10000.0,  # Starting balance of $10,000
+        user_id=new_user.id
+    )
+    db.add(new_account)
+    db.commit()
+    db.refresh(new_account)
+    
     return new_user
 
 

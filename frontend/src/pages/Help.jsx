@@ -3,6 +3,7 @@ import { useState } from 'react';
 const Help = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const faqs = [
     {
@@ -67,17 +68,49 @@ const Help = () => {
           <p className="text-xl text-gray-600 dark:text-gray-400">Find answers to common questions or contact our support team</p>
         </div>
 
-        {/* Search Bar */}
+        {/* Search Bar with Suggestions */}
         <div className="max-w-2xl mx-auto mb-12">
           <div className="relative">
             <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">search</span>
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => { setSearchQuery(e.target.value); setShowSuggestions(true); }}
+              onFocus={() => searchQuery && setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
               placeholder="Search for help..."
               className="w-full pl-12 pr-4 py-4 border border-gray-300 dark:border-gray-600 rounded-2xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-lg"
             />
+            {showSuggestions && searchQuery && (
+              <div className="absolute z-10 left-0 right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg max-h-64 overflow-y-auto">
+                {faqs
+                  .filter(f => f.question.toLowerCase().includes(searchQuery.toLowerCase()))
+                  .slice(0, 8)
+                  .map((f, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setSearchQuery(f.question);
+                        setShowSuggestions(false);
+                        // Optionally scroll to the matching FAQ
+                        const idx = filteredFaqs.findIndex(ff => ff.question === f.question);
+                        if (idx >= 0) {
+                          // no-op; details are filtered and shown
+                        }
+                      }}
+                      className="w-full text-left px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-gray-500 dark:text-gray-400 mr-2 align-middle">help_center</span>
+                      <span className="align-middle text-gray-800 dark:text-gray-200">{f.question}</span>
+                    </button>
+                  ))}
+                {faqs.filter(f => f.question.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
+                  <div className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">No matching FAQs</div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -158,88 +191,8 @@ const Help = () => {
               )}
             </div>
 
-            {/* Contact Form */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-                Still need help? Contact us
-              </h2>
-              
-              <form className="space-y-4">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Name
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Your name"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="your@email.com"
-                    />
-                  </div>
-                </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Subject
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="How can we help?"
-                  />
-                </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Message
-                  </label>
-                  <textarea
-                    rows="5"
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Describe your issue in detail..."
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-                >
-                  Send Message
-                </button>
-              </form>
-            </div>
-
-            {/* Resources */}
-            <div className="bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl p-6 text-white shadow-lg">
-              <h2 className="text-2xl font-bold mb-4">Helpful Resources</h2>
-              
-              <div className="grid md:grid-cols-2 gap-4">
-                {[
-                  { icon: 'book', label: 'User Guide', desc: 'Complete documentation' },
-                  { icon: 'play_circle', label: 'Video Tutorials', desc: 'Step-by-step guides' },
-                  { icon: 'newspaper', label: 'Latest Updates', desc: 'New features & changes' },
-                  { icon: 'forum', label: 'Community Forum', desc: 'Connect with users' },
-                ].map((resource, idx) => (
-                  <div key={idx} className="flex items-center p-4 rounded-xl bg-white/10 backdrop-blur-sm hover:bg-white/20 transition-all cursor-pointer">
-                    <span className="material-symbols-outlined text-3xl mr-3">{resource.icon}</span>
-                    <div>
-                      <div className="font-semibold">{resource.label}</div>
-                      <div className="text-sm opacity-80">{resource.desc}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
       </div>

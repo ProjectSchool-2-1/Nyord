@@ -4,20 +4,20 @@ from ..schemas import TransactionCreate, TransactionOut
 from ..database import get_db
 from ..models import Account, Transaction
 from ..rabbitmq import publish_event
-from .account_router import get_user_id
+from ..utils import get_current_user
 from ..tasks import process_transaction
 
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
 
 @router.post("/initiate", response_model=TransactionOut)
-def initiate_transaction(txn: TransactionCreate, 
-                         db: Session = Depends(get_db), 
-                         user_id: int = Depends(get_user_id)):
+def initiate_transaction(txn: TransactionCreate,
+                         db: Session = Depends(get_db),
+                         current_user = Depends(get_current_user)):
 
     # Check if source account belongs to the user
     src_acc = db.query(Account).filter(
         Account.id == txn.src_account,
-        Account.user_id == user_id
+        Account.user_id == current_user.id
     ).first()
 
     if not src_acc:
@@ -59,11 +59,11 @@ def initiate_transaction(txn: TransactionCreate,
 
 @router.get("/me", response_model=list[TransactionOut])
 def get_my_transactions(db: Session = Depends(get_db),
-                        user_id: int = Depends(get_user_id)):
+                        current_user = Depends(get_current_user)):
     """Get all transactions where user's accounts are involved (as source or destination)"""
     
     # Get all account IDs owned by the user
-    user_account_ids = [acc.id for acc in db.query(Account).filter(Account.user_id == user_id).all()]
+    user_account_ids = [acc.id for acc in db.query(Account).filter(Account.user_id == current_user.id).all()]
     
     if not user_account_ids:
         return []
@@ -80,7 +80,7 @@ def get_my_transactions(db: Session = Depends(get_db),
 @router.get("/{txn_id}", response_model=TransactionOut)
 def get_transaction(txn_id: int,
                     db: Session = Depends(get_db),
-                    user_id: int = Depends(get_user_id)):
+                    current_user = Depends(get_current_user)):
 
     txn = db.query(Transaction).filter(Transaction.id == txn_id).first()
 
@@ -88,7 +88,7 @@ def get_transaction(txn_id: int,
         raise HTTPException(status_code=404, detail="Transaction not found")
 
     # Confirm the user owns the source account
-    if txn.src_acc_rel.user_id != user_id:
+    if txn.src_acc_rel.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to view this transaction")
 
     return txn

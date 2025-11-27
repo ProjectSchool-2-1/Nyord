@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime, date
 from ..database import get_db
-from ..models import FixedDeposit, User
+from ..models import FixedDeposit, User, Account
 from ..schemas import FixedDepositCreate, FixedDepositOut
 from ..utils import get_current_user
 
@@ -38,6 +38,18 @@ def create_fd(fd_in: FixedDepositCreate, current_user: User = Depends(get_curren
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tenure must be positive months")
     if fd_in.principal <= 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Principal must be positive")
+
+    # Get user's primary account
+    user_account = db.query(Account).filter(Account.user_id == current_user.id).first()
+    if not user_account:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No account found. Please create an account first.")
+    
+    # Check if user has sufficient balance
+    if user_account.balance < fd_in.principal:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Insufficient balance. Available: ${user_account.balance:.2f}")
+    
+    # Deduct FD amount from account balance
+    user_account.balance -= fd_in.principal
 
     start = fd_in.start_date
     maturity = _add_months(start, fd_in.tenure_months)
@@ -81,6 +93,17 @@ def renew_fd(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fixed deposit not found")
     if old_fd.status != "ACTIVE":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only ACTIVE deposits can be renewed")
+
+    # Get user's account and check balance
+    user_account = db.query(Account).filter(Account.user_id == current_user.id).first()
+    if not user_account:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No account found")
+    
+    if user_account.balance < principal:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Insufficient balance. Available: ${user_account.balance:.2f}")
+    
+    # Deduct renewal amount from account
+    user_account.balance -= principal
 
     # Mark old as renewed
     old_fd.status = "RENEWED"

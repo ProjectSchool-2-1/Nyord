@@ -84,7 +84,7 @@ export const authAPI = {
 // Accounts API
 export const accountsAPI = {
   getAccounts: async () => {
-    return await apiRequest('/accounts');
+    return await apiRequest('/accounts/me');
   },
 
   createAccount: async (accountData) => {
@@ -92,6 +92,10 @@ export const accountsAPI = {
       method: 'POST',
       body: JSON.stringify(accountData),
     });
+  },
+
+  getUserAccounts: async (userId) => {
+    return await apiRequest(`/accounts/user/${userId}`);
   },
 };
 
@@ -130,10 +134,14 @@ export const transactionsAPI = {
   },
 
   createTransaction: async (transactionData) => {
-    return await apiRequest('/transactions', {
+    return await apiRequest('/transactions/initiate', {
       method: 'POST',
       body: JSON.stringify(transactionData),
     });
+  },
+
+  searchUsers: async (query) => {
+    return await apiRequest(`/users/search?q=${encodeURIComponent(query)}`);
   },
 };
 
