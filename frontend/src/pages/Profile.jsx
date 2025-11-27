@@ -7,6 +7,7 @@ const Profile = () => {
   const [activeTab, setActiveTab] = useState('personal');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [isEditing, setIsEditing] = useState(false);
   
   const [formData, setFormData] = useState({
     full_name: '',
@@ -29,13 +30,16 @@ const Profile = () => {
   const loadProfile = async () => {
     try {
       const profile = await profileAPI.getProfile();
+      const dob = profile.date_of_birth || '';
+      const dobValue = typeof dob === 'string' ? (dob.includes('T') ? dob.slice(0, 10) : dob) : '';
       setFormData({
         full_name: profile.full_name || '',
         email: profile.email || '',
         phone: profile.phone || '',
         address: profile.address || '',
-        date_of_birth: profile.date_of_birth || '',
+        date_of_birth: dobValue,
       });
+      setIsEditing(false);
     } catch (error) {
       console.error('Error loading profile:', error);
       showMessage('error', 'Failed to load profile');
@@ -55,6 +59,7 @@ const Profile = () => {
       const updatedUser = await profileAPI.updateProfile(formData);
       updateUser(updatedUser);
       showMessage('success', 'Profile updated successfully!');
+      setIsEditing(false);
     } catch (error) {
       showMessage('error', error.response?.data?.detail || error.message || 'Failed to update profile');
     } finally {
@@ -173,6 +178,22 @@ const Profile = () => {
             {activeTab === 'personal' && (
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Personal Information</h2>
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {isEditing ? 'Editing mode enabled' : 'View mode — click Edit to make changes'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing((v) => !v)}
+                    className={`px-4 py-2 rounded-xl text-sm font-medium ${
+                      isEditing
+                        ? 'border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}
+                  >
+                    {isEditing ? 'Stop Editing' : 'Edit'}
+                  </button>
+                </div>
                 
                 <form onSubmit={handleProfileUpdate} className="space-y-6">
                   <div className="grid md:grid-cols-2 gap-6">
@@ -184,7 +205,8 @@ const Profile = () => {
                         type="text"
                         value={formData.full_name}
                         onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        disabled={!isEditing}
+                        className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${!isEditing ? 'opacity-70 cursor-not-allowed' : ''}`}
                         placeholder="Enter your full name"
                       />
                     </div>
@@ -197,7 +219,8 @@ const Profile = () => {
                         type="email"
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        disabled={!isEditing}
+                        className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${!isEditing ? 'opacity-70 cursor-not-allowed' : ''}`}
                         placeholder="your.email@example.com"
                         required
                       />
@@ -211,7 +234,8 @@ const Profile = () => {
                         type="tel"
                         value={formData.phone}
                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        disabled={!isEditing}
+                        className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${!isEditing ? 'opacity-70 cursor-not-allowed' : ''}`}
                         placeholder="+1 (555) 000-0000"
                       />
                     </div>
@@ -224,7 +248,8 @@ const Profile = () => {
                         type="date"
                         value={formData.date_of_birth}
                         onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
-                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        disabled={!isEditing}
+                        className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${!isEditing ? 'opacity-70 cursor-not-allowed' : ''}`}
                       />
                     </div>
                   </div>
@@ -237,27 +262,30 @@ const Profile = () => {
                       value={formData.address}
                       onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                       rows="3"
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      disabled={!isEditing}
+                      className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${!isEditing ? 'opacity-70 cursor-not-allowed' : ''}`}
                       placeholder="Enter your address"
                     />
                   </div>
 
-                  <div className="flex justify-end space-x-4 pt-4">
-                    <button
-                      type="button"
-                      onClick={loadProfile}
-                      className="px-6 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {loading ? 'Saving...' : 'Save Changes'}
-                    </button>
-                  </div>
+                  {isEditing && (
+                    <div className="flex justify-end space-x-4 pt-4">
+                      <button
+                        type="button"
+                        onClick={loadProfile}
+                        className="px-6 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {loading ? 'Saving...' : 'Save Changes'}
+                      </button>
+                    </div>
+                  )}
                 </form>
               </div>
             )}
