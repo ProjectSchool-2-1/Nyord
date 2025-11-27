@@ -1,37 +1,79 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { cardsAPI } from '../services/api';
 
 const ManageCards = () => {
   const [activeCard, setActiveCard] = useState(0);
+  const [cards, setCards] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [requestLoading, setRequestLoading] = useState(false);
+  const [showRequestForm, setShowRequestForm] = useState(false);
+  const [selectedCardType, setSelectedCardType] = useState('Standard');
+  const [cardSettings, setCardSettings] = useState({
+    onlineTransactions: true,
+    contactlessPayments: true,
+    internationalUsage: false,
+    atmWithdrawals: true,
+    notifications: true,
+  });
 
-  const cards = [
-    {
-      type: 'Premium',
-      number: '4532 **** **** 4829',
-      holder: 'JOHN DOE',
-      expiry: '12/26',
-      cvv: '***',
-      gradient: 'from-blue-600 to-blue-800',
-      balance: 12450.00,
-    },
-    {
-      type: 'Platinum',
-      number: '5678 **** **** 8192',
-      holder: 'JOHN DOE',
-      expiry: '09/25',
-      cvv: '***',
-      gradient: 'from-purple-600 to-pink-600',
-      balance: 8230.00,
-    },
-    {
-      type: 'Gold',
-      number: '9012 **** **** 3476',
-      holder: 'JOHN DOE',
-      expiry: '03/27',
-      cvv: '***',
-      gradient: 'from-yellow-600 to-orange-600',
-      balance: 5820.00,
-    },
-  ];
+  useEffect(() => {
+    fetchCards();
+  }, []);
+
+  const fetchCards = async () => {
+    try {
+      setLoading(true);
+      const data = await cardsAPI.getMyCards();
+      setCards(data || []);
+    } catch (e) {
+      console.error('Failed to fetch cards', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRequestCard = async () => {
+    try {
+      setRequestLoading(true);
+      const newCard = await cardsAPI.requestCard({
+        card_type: selectedCardType,
+        credit_limit: 0, // Backend will use default based on type
+      });
+      setCards([...cards, newCard]);
+      setShowRequestForm(false);
+      setActiveCard(cards.length); // Select the newly created card
+    } catch (e) {
+      console.error('Failed to request card', e);
+      alert('Failed to request card. Please try again.');
+    } finally {
+      setRequestLoading(false);
+    }
+  };
+
+  const handleBlockCard = async (cardId) => {
+    try {
+      const updated = await cardsAPI.blockCard(cardId);
+      setCards(cards.map(c => c.id === updated.id ? updated : c));
+    } catch (e) {
+      console.error('Failed to block card', e);
+      alert('Failed to block card.');
+    }
+  };
+
+  const maskCardNumber = (number) => {
+    const parts = number.split(' ');
+    if (parts.length === 4) {
+      return `${parts[0]} **** **** ${parts[3]}`;
+    }
+    return number;
+  };
+
+  const toggleSetting = (settingKey) => {
+    setCardSettings(prev => ({
+      ...prev,
+      [settingKey]: !prev[settingKey]
+    }));
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -47,11 +89,21 @@ const ManageCards = () => {
           <div className="lg:col-span-2 space-y-8">
             {/* Card Carousel */}
             <div className="relative">
+              {loading ? (
+                <div className="w-full h-56 bg-white dark:bg-gray-800 rounded-2xl shadow-lg flex items-center justify-center">
+                  <p className="text-gray-500 dark:text-gray-400">Loading cards...</p>
+                </div>
+              ) : cards.length === 0 ? (
+                <div className="w-full h-56 bg-white dark:bg-gray-800 rounded-2xl shadow-lg flex flex-col items-center justify-center p-8">
+                  <span className="material-symbols-outlined text-6xl text-gray-400 mb-4">credit_card_off</span>
+                  <p className="text-gray-500 dark:text-gray-400 text-center mb-4">No cards yet. Request your first card to get started!</p>
+                </div>
+              ) : (
               <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide">
                 {cards.map((card, idx) => (
                   <div
                     key={idx}
-                    className={`flex-shrink-0 w-full sm:w-96 h-56 bg-gradient-to-br ${card.gradient} rounded-2xl shadow-2xl p-6 text-white cursor-pointer transform transition-all hover:scale-105 snap-center ${
+                    className={`flex-shrink-0 w-full sm:w-96 h-56 bg-gradient-to-br ${card.gradient_colors || 'from-gray-600 to-gray-800'} rounded-2xl shadow-2xl p-6 text-white cursor-pointer transform transition-all hover:scale-105 snap-center ${
                       activeCard === idx ? 'ring-4 ring-blue-400 ring-offset-4 dark:ring-offset-gray-900' : ''
                     }`}
                     onClick={() => setActiveCard(idx)}
@@ -59,102 +111,140 @@ const ManageCards = () => {
                     <div className="flex justify-between items-start mb-8">
                       <div>
                         <div className="text-xs opacity-80 mb-1">Card Type</div>
-                        <div className="text-lg font-bold">{card.type}</div>
+                        <div className="text-lg font-bold">{card.card_type}</div>
                       </div>
                       <span className="material-symbols-outlined text-4xl">contactless</span>
                     </div>
                     
                     <div className="mb-6">
-                      <div className="text-2xl font-bold tracking-wider mb-2">{card.number}</div>
-                      <div className="text-sm opacity-80">Balance: ${card.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+                      <div className="text-2xl font-bold tracking-wider mb-2">{maskCardNumber(card.card_number)}</div>
+                      <div className="text-sm opacity-80">Available: ${(card.available_credit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
                     </div>
 
                     <div className="flex justify-between items-end">
                       <div>
                         <div className="text-xs opacity-80 mb-1">Card Holder</div>
-                        <div className="font-semibold text-sm">{card.holder}</div>
+                        <div className="font-semibold text-sm">{card.card_holder}</div>
                       </div>
                       <div>
                         <div className="text-xs opacity-80 mb-1">Expires</div>
-                        <div className="font-semibold text-sm">{card.expiry}</div>
+                        <div className="font-semibold text-sm">{card.expiry_date}</div>
                       </div>
                       <div>
                         <div className="text-xs opacity-80 mb-1">CVV</div>
-                        <div className="font-semibold text-sm">{card.cvv}</div>
+                        <div className="font-semibold text-sm">***</div>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
+              )}
               
-              <button className="mt-4 w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-all">
+              <button onClick={() => setShowRequestForm(true)} className="mt-4 w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-all">
                 <span className="material-symbols-outlined mr-2">add</span>
                 Request New Card
               </button>
-            </div>
 
-            {/* Card Details */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Card Details</h2>
-              
-              <div className="grid sm:grid-cols-2 gap-6">
-                <div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Card Number</div>
-                  <div className="font-semibold text-gray-900 dark:text-white">{cards[activeCard].number}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Card Type</div>
-                  <div className="font-semibold text-gray-900 dark:text-white">{cards[activeCard].type}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Expiry Date</div>
-                  <div className="font-semibold text-gray-900 dark:text-white">{cards[activeCard].expiry}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Status</div>
-                  <div className="inline-flex items-center px-3 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-sm font-semibold">
-                    <span className="material-symbols-outlined text-sm mr-1">check_circle</span>
-                    Active
-                  </div>
-                </div>
-                <div className="sm:col-span-2">
-                  <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Available Credit</div>
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                    ${cards[activeCard].balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                  </div>
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-2">
-                    <div className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full" style={{ width: '68%' }}></div>
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">68% of $18,300 limit</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Quick Actions</h2>
-              
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {[
-                  { icon: 'block', label: 'Block Card', color: 'red' },
-                  { icon: 'pin', label: 'Change PIN', color: 'blue' },
-                  { icon: 'receipt_long', label: 'Statements', color: 'green' },
-                  { icon: 'credit_score', label: 'Upgrade Card', color: 'purple' },
-                ].map((action, idx) => (
-                  <button
-                    key={idx}
-                    className={`p-4 rounded-xl bg-${action.color}-50 dark:bg-${action.color}-900/20 hover:bg-${action.color}-100 dark:hover:bg-${action.color}-900/30 transition-all text-center`}
-                  >
-                    <span className={`material-symbols-outlined text-3xl text-${action.color}-600 dark:text-${action.color}-400 mb-2`}>
-                      {action.icon}
-                    </span>
-                    <div className={`text-sm font-medium text-${action.color}-700 dark:text-${action.color}-300`}>
-                      {action.label}
+              {/* Request Card Modal */}
+              {showRequestForm && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                  <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-md w-full">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Request New Card</h3>
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Card Type</label>
+                      <select value={selectedCardType} onChange={(e) => setSelectedCardType(e.target.value)} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        <option value="Standard">Standard ($5,000 limit)</option>
+                        <option value="Gold">Gold ($15,000 limit)</option>
+                        <option value="Platinum">Platinum ($25,000 limit)</option>
+                        <option value="Premium">Premium ($50,000 limit)</option>
+                      </select>
                     </div>
-                  </button>
+                    <div className="flex gap-3">
+                      <button onClick={() => setShowRequestForm(false)} className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</button>
+                      <button onClick={handleRequestCard} disabled={requestLoading} className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-60">{requestLoading ? 'Requesting...' : 'Request Card'}</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* All Cards Details */}
+            {cards.length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">All Cards</h2>
+              
+              <div className="space-y-6">
+                {cards.map((card, idx) => (
+                  <div key={card.id} className="p-4 rounded-xl bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className={`w-12 h-8 rounded bg-gradient-to-br ${card.gradient_colors || 'from-gray-600 to-gray-800'}`}></div>
+                          <div>
+                            <div className="font-bold text-gray-900 dark:text-white">{card.card_type}</div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400">{maskCardNumber(card.card_number)}</div>
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">Expiry Date</div>
+                            <div className="text-sm font-semibold text-gray-900 dark:text-white">{card.expiry_date}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">Status</div>
+                            <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${
+                              card.status === 'ACTIVE' ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' :
+                              card.status === 'BLOCKED' ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' :
+                              'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400'
+                            }`}>
+                              {card.status}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">Available Credit</div>
+                            <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                              ${(card.available_credit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">Credit Limit</div>
+                            <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                              ${(card.credit_limit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2 mb-4">
+                          <div className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full" style={{ width: `${((card.available_credit || 0) / (card.credit_limit || 1)) * 100}%` }}></div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons for each card */}
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => card.status === 'ACTIVE' && handleBlockCard(card.id)}
+                        disabled={card.status !== 'ACTIVE'}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <span className="material-symbols-outlined text-lg">block</span>
+                        {card.status === 'BLOCKED' ? 'Blocked' : 'Block Card'}
+                      </button>
+                      <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all text-sm font-medium">
+                        <span className="material-symbols-outlined text-lg">pin</span>
+                        Change PIN
+                      </button>
+                      <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/30 transition-all text-sm font-medium">
+                        <span className="material-symbols-outlined text-lg">receipt_long</span>
+                        Statements
+                      </button>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
+            )}
           </div>
 
           {/* Right: Settings & Transactions */}
@@ -164,65 +254,86 @@ const ManageCards = () => {
               <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Card Settings</h2>
               
               <div className="space-y-4">
-                {[
-                  { label: 'Online Transactions', enabled: true },
-                  { label: 'Contactless Payments', enabled: true },
-                  { label: 'International Usage', enabled: false },
-                  { label: 'ATM Withdrawals', enabled: true },
-                  { label: 'Notifications', enabled: true },
-                ].map((setting, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                    <span className="text-gray-700 dark:text-gray-300 font-medium">{setting.label}</span>
-                    <button
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        setting.enabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                <div className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                  <span className="text-gray-700 dark:text-gray-300 font-medium">Online Transactions</span>
+                  <button
+                    onClick={() => toggleSetting('onlineTransactions')}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      cardSettings.onlineTransactions ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        cardSettings.onlineTransactions ? 'translate-x-6' : 'translate-x-1'
                       }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          setting.enabled ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                    </button>
-                  </div>
-                ))}
+                    />
+                  </button>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                  <span className="text-gray-700 dark:text-gray-300 font-medium">Contactless Payments</span>
+                  <button
+                    onClick={() => toggleSetting('contactlessPayments')}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      cardSettings.contactlessPayments ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        cardSettings.contactlessPayments ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                  <span className="text-gray-700 dark:text-gray-300 font-medium">International Usage</span>
+                  <button
+                    onClick={() => toggleSetting('internationalUsage')}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      cardSettings.internationalUsage ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        cardSettings.internationalUsage ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                  <span className="text-gray-700 dark:text-gray-300 font-medium">ATM Withdrawals</span>
+                  <button
+                    onClick={() => toggleSetting('atmWithdrawals')}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      cardSettings.atmWithdrawals ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        cardSettings.atmWithdrawals ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                  <span className="text-gray-700 dark:text-gray-300 font-medium">Notifications</span>
+                  <button
+                    onClick={() => toggleSetting('notifications')}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      cardSettings.notifications ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        cardSettings.notifications ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* Recent Transactions */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Recent Transactions</h2>
-              
-              <div className="space-y-3">
-                {[
-                  { name: 'Amazon', amount: -89.99, date: 'Today', icon: 'shopping_bag' },
-                  { name: 'Starbucks', amount: -12.50, date: 'Yesterday', icon: 'local_cafe' },
-                  { name: 'Gas Station', amount: -45.00, date: 'Jan 14', icon: 'local_gas_station' },
-                  { name: 'Refund', amount: 25.00, date: 'Jan 13', icon: 'keyboard_return' },
-                ].map((txn, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        txn.amount > 0 ? 'bg-green-100 dark:bg-green-900/30' : 'bg-gray-100 dark:bg-gray-700'
-                      }`}>
-                        <span className={`material-symbols-outlined text-lg ${
-                          txn.amount > 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'
-                        }`}>
-                          {txn.icon}
-                        </span>
-                      </div>
-                      <div>
-                        <div className="font-medium text-gray-900 dark:text-white text-sm">{txn.name}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{txn.date}</div>
-                      </div>
-                    </div>
-                    <div className={`font-semibold ${txn.amount > 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
-                      {txn.amount > 0 ? '+' : ''}${Math.abs(txn.amount).toFixed(2)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+
+           
           </div>
         </div>
       </div>

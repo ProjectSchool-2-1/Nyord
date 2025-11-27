@@ -133,3 +133,27 @@ class LoanOut(BaseModel):
 
 class LoanPayment(BaseModel):
     amount: float
+
+
+# ------------------ CARDS -------------------
+class CardCreate(BaseModel):
+    card_type: str  # 'Premium', 'Platinum', 'Gold', 'Standard'
+    credit_limit: float = 5000.0
+
+
+class CardOut(BaseModel):
+    id: int
+    user_id: int
+    card_number: str
+    card_type: str
+    card_holder: str
+    expiry_date: str
+    cvv: str
+    credit_limit: float
+    available_credit: float
+    status: str
+    issued_date: Optional[date]
+    gradient_colors: Optional[str]
+
+    class Config:
+        from_attributes = True

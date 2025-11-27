@@ -176,4 +176,30 @@ export const loansAPI = {
   },
 };
 
+// Cards API
+export const cardsAPI = {
+  getMyCards: async () => {
+    return await apiRequest('/cards/me');
+  },
+  requestCard: async (cardData) => {
+    return await apiRequest('/cards/', {
+      method: 'POST',
+      body: JSON.stringify(cardData),
+    });
+  },
+  getCard: async (cardId) => {
+    return await apiRequest(`/cards/${cardId}`);
+  },
+  blockCard: async (cardId) => {
+    return await apiRequest(`/cards/${cardId}/block`, {
+      method: 'POST',
+    });
+  },
+  unblockCard: async (cardId) => {
+    return await apiRequest(`/cards/${cardId}/unblock`, {
+      method: 'POST',
+    });
+  },
+};
+
 export { getToken, setToken, removeToken };

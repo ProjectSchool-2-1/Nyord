@@ -21,7 +21,7 @@ class User(Base):
     accounts = relationship("Account", back_populates="owner")
     fixed_deposits = relationship("FixedDeposit", back_populates="owner")
     loans = relationship("Loan", back_populates="owner")
-    fixed_deposits = relationship("FixedDeposit", back_populates="owner")
+    cards = relationship("Card", back_populates="owner")
 
 
 class Account(Base):
@@ -94,3 +94,22 @@ class Loan(Base):
     account_ref = Column(String, nullable=True)
 
     owner = relationship("User", back_populates="loans")
+
+
+class Card(Base):
+    __tablename__ = "cards"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    card_number = Column(String, unique=True, nullable=False)
+    card_type = Column(String, nullable=False)  # 'Premium', 'Platinum', 'Gold', 'Standard'
+    card_holder = Column(String, nullable=False)
+    expiry_date = Column(String, nullable=False)  # MM/YY format
+    cvv = Column(String, nullable=False)
+    credit_limit = Column(Float, default=0.0)
+    available_credit = Column(Float, default=0.0)
+    status = Column(String, default="PENDING")  # PENDING, ACTIVE, BLOCKED, EXPIRED
+    issued_date = Column(Date, nullable=True)
+    gradient_colors = Column(String, nullable=True)  # Store gradient class for UI
+
+    owner = relationship("User", back_populates="cards")
