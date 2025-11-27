@@ -247,9 +247,12 @@ build/
 .env
 .env.*
 .env.local
+backend/.env
+backend/env/
 
 # Python
 __pycache__/
+backend/__pycache__/
 *.pyc
 *.pyo
 *.pyd
