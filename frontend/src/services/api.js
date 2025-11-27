@@ -202,4 +202,11 @@ export const cardsAPI = {
   },
 };
 
+// Dashboard API
+export const dashboardAPI = {
+  getSummary: async () => {
+    return await apiRequest('/dashboard/summary');
+  },
+};
+
 export { getToken, setToken, removeToken };

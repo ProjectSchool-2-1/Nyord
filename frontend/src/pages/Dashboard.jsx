@@ -1,35 +1,84 @@
 import { useEffect, useState } from 'react';
-import { fixedDepositsAPI } from '../services/api';
+import { dashboardAPI } from '../services/api';
 
 const Dashboard = () => {
-  const [fdSummary, setFdSummary] = useState({ totalInvestment: 0, totalMaturity: 0, count: 0, avgRate: 0 });
+  const [dashboardData, setDashboardData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      const data = await dashboardAPI.getSummary();
+      setDashboardData(data);
+      setError(null);
+    } catch (err) {
+      console.error('Failed to fetch dashboard data:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    (async () => {
-      try {
-        const fds = await fixedDepositsAPI.getMyFDs();
-        const totalInvestment = fds.reduce((s, fd) => s + (fd.principal || 0), 0);
-        const totalMaturity = fds.reduce((s, fd) => s + (fd.maturity_amount || 0), 0);
-        const avgRate = fds.length ? (fds.reduce((s, fd) => s + (fd.rate || 0), 0) / fds.length) : 0;
-        setFdSummary({ totalInvestment, totalMaturity, count: fds.length, avgRate });
-      } catch (e) {
-        // ignore if not logged in or no FDs
-      }
-    })();
+    fetchDashboardData();
   }, []);
 
-  const accounts = [
-    { name: 'Savings Account', number: '****4829', balance: 12450.00, type: 'savings' },
-    { name: 'Current Account', number: '****8192', balance: 5820.50, type: 'current' },
-    { name: 'Credit Card', number: '****3476', balance: -1250.00, type: 'credit' },
-  ];
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
-  const transactions = [
-    { id: 1, name: 'Amazon Purchase', amount: -89.99, date: '2024-01-15', type: 'debit', category: 'Shopping' },
-    { id: 2, name: 'Salary Deposit', amount: 5000.00, date: '2024-01-14', type: 'credit', category: 'Income' },
-    { id: 3, name: 'Netflix Subscription', amount: -15.99, date: '2024-01-13', type: 'debit', category: 'Entertainment' },
-    { id: 4, name: 'Grocery Store', amount: -125.50, date: '2024-01-12', type: 'debit', category: 'Food' },
-  ];
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <span className="material-symbols-outlined text-6xl text-red-500 mb-4">error</span>
+          <p className="text-red-600 dark:text-red-400">{error}</p>
+          <button 
+            onClick={fetchDashboardData}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const {
+    total_balance = 0,
+    balance_change_percent = 0,
+    monthly_income = 0,
+    income_change_percent = 0,
+    monthly_expenses = 0,
+    expense_change_percent = 0,
+    accounts = [],
+    recent_transactions = [],
+  } = dashboardData || {};
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+    }).format(amount);
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -45,28 +94,46 @@ const Dashboard = () => {
           <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white">
             <div className="flex items-center justify-between mb-4">
               <span className="material-symbols-outlined text-4xl opacity-80">account_balance_wallet</span>
-              <span className="text-sm bg-white/20 px-3 py-1 rounded-full">+12.5%</span>
+              <span className={`text-sm px-3 py-1 rounded-full ${
+                balance_change_percent >= 0 
+                  ? 'bg-white/20' 
+                  : 'bg-red-500/30'
+              }`}>
+                {balance_change_percent >= 0 ? '+' : ''}{balance_change_percent.toFixed(1)}%
+              </span>
             </div>
             <div className="text-sm opacity-90 mb-1">Total Balance</div>
-            <div className="text-3xl font-bold">$18,270.50</div>
+            <div className="text-3xl font-bold">{formatCurrency(total_balance)}</div>
           </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
             <div className="flex items-center justify-between mb-4">
               <span className="material-symbols-outlined text-4xl text-green-500">trending_up</span>
-              <span className="text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-3 py-1 rounded-full">+8.2%</span>
+              <span className={`text-sm px-3 py-1 rounded-full ${
+                income_change_percent >= 0
+                  ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30'
+                  : 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30'
+              }`}>
+                {income_change_percent >= 0 ? '+' : ''}{income_change_percent.toFixed(1)}%
+              </span>
             </div>
             <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Monthly Income</div>
-            <div className="text-3xl font-bold text-gray-900 dark:text-white">$5,000.00</div>
+            <div className="text-3xl font-bold text-gray-900 dark:text-white">{formatCurrency(monthly_income)}</div>
           </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
             <div className="flex items-center justify-between mb-4">
               <span className="material-symbols-outlined text-4xl text-red-500">trending_down</span>
-              <span className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 px-3 py-1 rounded-full">-3.5%</span>
+              <span className={`text-sm px-3 py-1 rounded-full ${
+                expense_change_percent <= 0
+                  ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30'
+                  : 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30'
+              }`}>
+                {expense_change_percent.toFixed(1)}%
+              </span>
             </div>
             <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Monthly Expenses</div>
-            <div className="text-3xl font-bold text-gray-900 dark:text-white">$2,145.30</div>
+            <div className="text-3xl font-bold text-gray-900 dark:text-white">{formatCurrency(monthly_expenses)}</div>
           </div>
         </div>
 
@@ -79,61 +146,119 @@ const Dashboard = () => {
                 <button className="text-blue-600 dark:text-blue-400 text-sm font-medium hover:underline">View All</button>
               </div>
               
-              <div className="space-y-4">
-                {accounts.map((account, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-4 rounded-xl bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer">
-                    <div className="flex items-center space-x-4">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                        account.type === 'savings' ? 'bg-blue-100 dark:bg-blue-900/30' :
-                        account.type === 'current' ? 'bg-green-100 dark:bg-green-900/30' :
-                        'bg-purple-100 dark:bg-purple-900/30'
-                      }`}>
-                        <span className={`material-symbols-outlined ${
-                          account.type === 'savings' ? 'text-blue-600 dark:text-blue-400' :
-                          account.type === 'current' ? 'text-green-600 dark:text-green-400' :
-                          'text-purple-600 dark:text-purple-400'
+              {accounts.length === 0 ? (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  <span className="material-symbols-outlined text-5xl mb-2 opacity-50">account_balance</span>
+                  <p>No accounts found</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {accounts.map((account) => (
+                    <div key={account.id} className="flex items-center justify-between p-4 rounded-xl bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer">
+                      <div className="flex items-center space-x-4">
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                          account.type === 'savings' ? 'bg-blue-100 dark:bg-blue-900/30' :
+                          account.type === 'current' ? 'bg-green-100 dark:bg-green-900/30' :
+                          'bg-purple-100 dark:bg-purple-900/30'
                         }`}>
-                          {account.type === 'credit' ? 'credit_card' : 'account_balance'}
-                        </span>
+                          <span className={`material-symbols-outlined ${
+                            account.type === 'savings' ? 'text-blue-600 dark:text-blue-400' :
+                            account.type === 'current' ? 'text-green-600 dark:text-green-400' :
+                            'text-purple-600 dark:text-purple-400'
+                          }`}>
+                            account_balance
+                          </span>
+                        </div>
+                        <div>
+                          <div className="font-semibold text-gray-900 dark:text-white">
+                            {account.type === 'savings' ? 'Savings Account' : 
+                             account.type === 'current' ? 'Current Account' : 'Account'}
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">****{account.account_number.slice(-4)}</div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="font-semibold text-gray-900 dark:text-white">{account.name}</div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">{account.number}</div>
+                      <div className={`text-xl font-bold ${account.balance >= 0 ? 'text-gray-900 dark:text-white' : 'text-red-600 dark:text-red-400'}`}>
+                        {formatCurrency(Math.abs(account.balance))}
                       </div>
                     </div>
-                    <div className={`text-xl font-bold ${account.balance >= 0 ? 'text-gray-900 dark:text-white' : 'text-red-600 dark:text-red-400'}`}>
-                      ${Math.abs(account.balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Spending Chart */}
+            {/* Recent Transactions */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Monthly Spending</h2>
-              <div className="space-y-4">
-                {[
-                  { category: 'Food & Dining', amount: 850, percentage: 40, color: 'bg-blue-500' },
-                  { category: 'Shopping', amount: 620, percentage: 29, color: 'bg-purple-500' },
-                  { category: 'Transportation', amount: 420, percentage: 20, color: 'bg-green-500' },
-                  { category: 'Entertainment', amount: 255, percentage: 11, color: 'bg-yellow-500' },
-                ].map((item, idx) => (
-                  <div key={idx}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{item.category}</span>
-                      <span className="text-sm font-semibold text-gray-900 dark:text-white">${item.amount}</span>
-                    </div>
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <div className={`${item.color} h-2 rounded-full`} style={{ width: `${item.percentage}%` }}></div>
-                    </div>
-                  </div>
-                ))}
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Recent Transactions</h2>
+                <button className="text-blue-600 dark:text-blue-400 text-sm font-medium hover:underline">View All</button>
               </div>
+
+              {recent_transactions.length === 0 ? (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  <span className="material-symbols-outlined text-5xl mb-2 opacity-50">receipt_long</span>
+                  <p>No recent transactions</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {recent_transactions.map((txn) => (
+                    <div key={txn.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          txn.type === 'credit' 
+                            ? 'bg-green-100 dark:bg-green-900/30' 
+                            : 'bg-red-100 dark:bg-red-900/30'
+                        }`}>
+                          <span className={`material-symbols-outlined text-sm ${
+                            txn.type === 'credit' 
+                              ? 'text-green-600 dark:text-green-400' 
+                              : 'text-red-600 dark:text-red-400'
+                          }`}>
+                            {txn.type === 'credit' ? 'arrow_downward' : 'arrow_upward'}
+                          </span>
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-900 dark:text-white">
+                            {txn.type === 'credit' ? 'Received' : 'Sent'}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {formatDate(txn.timestamp)} • {txn.status}
+                          </div>
+                        </div>
+                      </div>
+                      <div className={`font-bold ${
+                        txn.type === 'credit' 
+                          ? 'text-green-600 dark:text-green-400' 
+                          : 'text-red-600 dark:text-red-400'
+                      }`}>
+                        {txn.type === 'credit' ? '+' : '-'}{formatCurrency(txn.amount)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-
+          {/* Quick Actions Sidebar */}
+          <div className="space-y-6">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Quick Actions</h2>
+              <div className="space-y-3">
+                <button className="w-full flex items-center space-x-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors">
+                  <span className="material-symbols-outlined text-blue-600 dark:text-blue-400">send</span>
+                  <span className="font-medium text-gray-900 dark:text-white">Send Money</span>
+                </button>
+                <button className="w-full flex items-center space-x-3 p-3 rounded-lg bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors">
+                  <span className="material-symbols-outlined text-green-600 dark:text-green-400">add_circle</span>
+                  <span className="font-medium text-gray-900 dark:text-white">Request Money</span>
+                </button>
+                <button className="w-full flex items-center space-x-3 p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors">
+                  <span className="material-symbols-outlined text-purple-600 dark:text-purple-400">credit_card</span>
+                  <span className="font-medium text-gray-900 dark:text-white">Pay Bills</span>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
