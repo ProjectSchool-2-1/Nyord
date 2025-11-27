@@ -162,3 +162,26 @@ class CardOut(BaseModel):
 
 class CardBlockRequest(BaseModel):
     pin: str  # 4-digit PIN for verification
+
+class CardChangePinRequest(BaseModel):
+    current_pin: str
+    new_pin: str
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls._validate_pins
+
+    @staticmethod
+    def _validate_pin_value(v: str) -> str:
+        if not v or len(v) != 4 or not v.isdigit():
+            raise ValueError('PIN must be a 4-digit number')
+        return v
+
+    @classmethod
+    def _validate_pins(cls, values):
+        # Pydantic v1-style validator fallback
+        if isinstance(values, dict):
+            for key in ('current_pin', 'new_pin'):
+                if key in values:
+                    values[key] = cls._validate_pin_value(values[key])
+        return values

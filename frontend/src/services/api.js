@@ -202,6 +202,18 @@ export const cardsAPI = {
       body: JSON.stringify({ pin }),
     });
   },
+  verifyPin: async (cardId, pin) => {
+    return await apiRequest(`/cards/${cardId}/verify-pin`, {
+      method: 'POST',
+      body: JSON.stringify({ pin }),
+    });
+  },
+  changePin: async (cardId, currentPin, newPin) => {
+    return await apiRequest(`/cards/${cardId}/change-pin`, {
+      method: 'POST',
+      body: JSON.stringify({ current_pin: currentPin, new_pin: newPin }),
+    });
+  },
 };
 
 // Dashboard API

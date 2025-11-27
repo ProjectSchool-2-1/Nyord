@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from datetime import date, timedelta
 from ..database import get_db
 from ..models import Card, User
-from ..schemas import CardCreate, CardOut, CardBlockRequest
+from ..schemas import CardCreate, CardOut, CardBlockRequest, CardChangePinRequest
 from ..utils import get_current_user, hash_password, verify_password
 import random
 from dateutil.relativedelta import relativedelta
@@ -121,6 +121,56 @@ def get_card(
     
     return card
 
+@router.post("/{card_id}/verify-pin")
+def verify_card_pin(
+    card_id: int,
+    payload: CardBlockRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Verify the provided PIN for the card belongs to the current user."""
+    card = db.query(Card).filter(
+        Card.id == card_id,
+        Card.user_id == current_user.id
+    ).first()
+
+    if not card:
+        raise HTTPException(status_code=404, detail="Card not found")
+
+    if not verify_password(payload.pin, card.pin):
+        raise HTTPException(status_code=401, detail="Invalid PIN")
+
+    return {"message": "PIN verified"}
+
+@router.post("/{card_id}/change-pin")
+def change_pin(
+    card_id: int,
+    payload: CardChangePinRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Change card PIN: verify current PIN then set new PIN."""
+    card = db.query(Card).filter(
+        Card.id == card_id,
+        Card.user_id == current_user.id
+    ).first()
+
+    if not card:
+        raise HTTPException(status_code=404, detail="Card not found")
+
+    # Verify existing PIN
+    if not verify_password(payload.current_pin, card.pin):
+        raise HTTPException(status_code=401, detail="Invalid current PIN")
+
+    # Validate new PIN format
+    if not payload.new_pin or len(payload.new_pin) != 4 or not payload.new_pin.isdigit():
+        raise HTTPException(status_code=400, detail="New PIN must be exactly 4 digits")
+
+    # Hash and update
+    card.pin = hash_password(payload.new_pin)
+    db.commit()
+
+    return {"message": "PIN updated successfully"}
 
 @router.post("/{card_id}/block", response_model=CardOut)
 def block_card(

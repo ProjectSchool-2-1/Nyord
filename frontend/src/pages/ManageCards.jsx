@@ -19,6 +19,14 @@ const ManageCards = () => {
     atmWithdrawals: true,
     notifications: true,
   });
+  const [visibleCardNumbers, setVisibleCardNumbers] = useState(new Set());
+  const [showChangePinModal, setShowChangePinModal] = useState(false);
+  const [changePinCardId, setChangePinCardId] = useState(null);
+  const [currentPinInput, setCurrentPinInput] = useState('');
+  const [newPinInput, setNewPinInput] = useState('');
+  const [confirmNewPinInput, setConfirmNewPinInput] = useState('');
+  const [changePinLoading, setChangePinLoading] = useState(false);
+  const [changePinStep, setChangePinStep] = useState(1); // 1: current, 2: new+confirm
 
   useEffect(() => {
     fetchCards();
@@ -97,11 +105,74 @@ const ManageCards = () => {
     return number;
   };
 
+  const toggleCardNumberVisibility = (cardId) => {
+    setVisibleCardNumbers(prev => {
+      const next = new Set(prev);
+      if (next.has(cardId)) {
+        next.delete(cardId);
+      } else {
+        next.add(cardId);
+      }
+      return next;
+    });
+  };
+
   const toggleSetting = (settingKey) => {
     setCardSettings(prev => ({
       ...prev,
       [settingKey]: !prev[settingKey]
     }));
+  };
+
+  const openChangePinModal = (cardId) => {
+    setChangePinCardId(cardId);
+    setCurrentPinInput('');
+    setNewPinInput('');
+    setConfirmNewPinInput('');
+    setChangePinStep(1);
+    setShowChangePinModal(true);
+  };
+
+  const handleChangePinNext = () => {
+    if (!currentPinInput || currentPinInput.length !== 4 || !/^\d{4}$/.test(currentPinInput)) {
+      alert('Enter your current 4-digit PIN');
+      return;
+    }
+    // Verify current PIN against backend
+    (async () => {
+      try {
+        await cardsAPI.verifyPin(changePinCardId, currentPinInput);
+        setChangePinStep(2);
+      } catch (e) {
+        console.error('Invalid current PIN', e);
+        alert(e.message || 'Invalid current PIN');
+      }
+    })();
+  };
+
+  const handleChangePinSubmit = async () => {
+    if (!newPinInput || newPinInput.length !== 4 || !/^\d{4}$/.test(newPinInput)) {
+      alert('Enter a new valid 4-digit PIN');
+      return;
+    }
+    if (confirmNewPinInput !== newPinInput) {
+      alert('New PIN and confirmation do not match');
+      return;
+    }
+    try {
+      setChangePinLoading(true);
+      await cardsAPI.changePin(changePinCardId, currentPinInput, newPinInput);
+      setShowChangePinModal(false);
+      setCurrentPinInput('');
+      setNewPinInput('');
+      setConfirmNewPinInput('');
+      alert('PIN updated successfully');
+    } catch (e) {
+      console.error('Failed to change PIN', e);
+      alert(e.message || 'Failed to change PIN');
+    } finally {
+      setChangePinLoading(false);
+    }
   };
 
   return (
@@ -142,11 +213,23 @@ const ManageCards = () => {
                         <div className="text-xs opacity-80 mb-1">Card Type</div>
                         <div className="text-lg font-bold">{card.card_type}</div>
                       </div>
-                      <span className="material-symbols-outlined text-4xl">contactless</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); toggleCardNumberVisibility(card.id); }}
+                          className="rounded-full bg-white/15 hover:bg-white/25 p-2"
+                          title={visibleCardNumbers.has(card.id) ? 'Hide card number' : 'Show card number'}
+                        >
+                          <span className="material-symbols-outlined text-xl">{visibleCardNumbers.has(card.id) ? 'visibility_off' : 'visibility'}</span>
+                        </button>
+                        <span className="material-symbols-outlined text-4xl">contactless</span>
+                      </div>
                     </div>
                     
                     <div className="mb-6">
-                      <div className="text-2xl font-bold tracking-wider mb-2">{maskCardNumber(card.card_number)}</div>
+                      <div className="text-2xl font-bold tracking-wider mb-2">
+                        {visibleCardNumbers.has(card.id) ? card.card_number : maskCardNumber(card.card_number)}
+                      </div>
                       <div className="text-sm opacity-80">Available: ${(card.available_credit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
                     </div>
 
@@ -161,7 +244,7 @@ const ManageCards = () => {
                       </div>
                       <div>
                         <div className="text-xs opacity-80 mb-1">CVV</div>
-                        <div className="font-semibold text-sm">***</div>
+                        <div className="font-semibold text-sm">{visibleCardNumbers.has(card.id) ? (card.cvv || '***') : '***'}</div>
                       </div>
                     </div>
                   </div>
@@ -282,7 +365,7 @@ const ManageCards = () => {
                           Unblock Card
                         </button>
                       ) : null}
-                      <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all text-sm font-medium">
+                      <button onClick={() => openChangePinModal(card.id)} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all text-sm font-medium">
                         <span className="material-symbols-outlined text-lg">pin</span>
                         Change PIN
                       </button>
@@ -417,6 +500,86 @@ const ManageCards = () => {
                   Confirm
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Change PIN Modal */}
+        {showChangePinModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-sm w-full">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Change Card PIN</h3>
+              {changePinStep === 1 ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Current PIN</label>
+                    <input
+                      type="password"
+                      maxLength={4}
+                      value={currentPinInput}
+                      onChange={(e) => setCurrentPinInput(e.target.value.replace(/\D/g, ''))}
+                      placeholder="Enter current PIN"
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="flex gap-3 mt-2">
+                    <button
+                      onClick={() => { setShowChangePinModal(false); setCurrentPinInput(''); setNewPinInput(''); setConfirmNewPinInput(''); }}
+                      className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleChangePinNext}
+                      className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">New PIN</label>
+                    <input
+                      type="password"
+                      maxLength={4}
+                      value={newPinInput}
+                      onChange={(e) => setNewPinInput(e.target.value.replace(/\D/g, ''))}
+                      placeholder="Enter new PIN"
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Confirm New PIN</label>
+                    <input
+                      type="password"
+                      maxLength={4}
+                      value={confirmNewPinInput}
+                      onChange={(e) => setConfirmNewPinInput(e.target.value.replace(/\D/g, ''))}
+                      placeholder="Re-enter new PIN"
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <div className="flex gap-3 mt-2">
+                    <button
+                      onClick={() => { setShowChangePinModal(false); setCurrentPinInput(''); setNewPinInput(''); setConfirmNewPinInput(''); }}
+                      className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleChangePinSubmit}
+                      disabled={changePinLoading}
+                      className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-60"
+                    >
+                      {changePinLoading ? 'Updating...' : 'Update PIN'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
