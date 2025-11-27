@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, Date
 from sqlalchemy.orm import relationship
 from sqlalchemy import DateTime, Text
 from datetime import datetime
@@ -11,8 +11,17 @@ class User(Base):
     username = Column(String, unique=True, index=True, nullable=False)
     email = Column(String, unique=True, nullable=False)
     hashed_password = Column(String, nullable=False)
+    
+    # Additional profile fields
+    full_name = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    date_of_birth = Column(Date, nullable=True)
+    address = Column(String, nullable=True)
 
     accounts = relationship("Account", back_populates="owner")
+    fixed_deposits = relationship("FixedDeposit", back_populates="owner")
+    loans = relationship("Loan", back_populates="owner")
+    fixed_deposits = relationship("FixedDeposit", back_populates="owner")
 
 
 class Account(Base):
@@ -47,3 +56,41 @@ class AuditLog(Base):
     event_type = Column(String, index=True)
     message = Column(Text)
     timestamp = Column(DateTime, default=datetime.utcnow)
+
+
+class FixedDeposit(Base):
+    __tablename__ = "fixed_deposits"
+
+    id = Column(Integer, primary_key=True, index=True)
+    fd_number = Column(String, unique=True, index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    principal = Column(Float, nullable=False)
+    rate = Column(Float, nullable=False)
+    start_date = Column(Date, nullable=False)
+    maturity_date = Column(Date, nullable=False)
+    tenure_months = Column(Integer, nullable=False)
+    status = Column(String, default="ACTIVE")
+    maturity_amount = Column(Float, nullable=True)
+
+    owner = relationship("User", back_populates="fixed_deposits")
+
+
+class Loan(Base):
+    __tablename__ = "loans"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    loan_type = Column(String, nullable=False)  # 'Home', 'Personal', 'Auto'
+    principal = Column(Float, nullable=False)
+    rate = Column(Float, nullable=False)  # annual %
+    tenure_months = Column(Integer, nullable=False)
+    start_date = Column(Date, nullable=False)
+    emi = Column(Float, nullable=False)
+    total_payable = Column(Float, nullable=False)
+    amount_paid = Column(Float, default=0.0)
+    outstanding = Column(Float, nullable=False)
+    next_due_date = Column(Date, nullable=True)
+    status = Column(String, default="ACTIVE")  # ACTIVE, CLOSED, DEFAULTED
+    account_ref = Column(String, nullable=True)
+
+    owner = relationship("User", back_populates="loans")

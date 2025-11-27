@@ -1,5 +1,6 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { buttonVariants, Button } from '@/components/ui/button';
 import {
@@ -100,6 +101,18 @@ function MobileNav({ nav }) {
 
 // User Profile Dropdown
 function UserProfileDropdown({ align = "end", sizeClass = "h-8 w-8" }) {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/signin');
+  };
+
+  if (!user) return null;
+
+  const userInitials = user.username ? user.username.substring(0, 2).toUpperCase() : 'U';
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -112,7 +125,7 @@ function UserProfileDropdown({ align = "end", sizeClass = "h-8 w-8" }) {
         >
           <Avatar className={cn("h-full w-full")}>
             <AvatarImage src="/avatar-1.png" alt="User avatar" />
-            <AvatarFallback>JD</AvatarFallback>
+            <AvatarFallback>{userInitials}</AvatarFallback>
           </Avatar>
         </button>
       </DropdownMenuTrigger>
@@ -120,9 +133,9 @@ function UserProfileDropdown({ align = "end", sizeClass = "h-8 w-8" }) {
       <DropdownMenuContent align={align} className="w-56">
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">John Doe</p>
+            <p className="text-sm font-medium leading-none">{user.username}</p>
             <p className="text-xs leading-none text-muted-foreground">
-              john@example.com
+              {user.email}
             </p>
           </div>
         </DropdownMenuLabel>
@@ -154,7 +167,7 @@ function UserProfileDropdown({ align = "end", sizeClass = "h-8 w-8" }) {
 
         <DropdownMenuSeparator />
 
-        <DropdownMenuItem className="flex items-center cursor-pointer">
+        <DropdownMenuItem onClick={handleLogout} className="flex items-center cursor-pointer">
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>
         </DropdownMenuItem>
@@ -181,6 +194,7 @@ const navigationLinks = [
 
 export default function Navbar() {
   const location = useLocation();
+  const { user } = useAuth();
   
   const isActive = (path) => location.pathname === path;
 
@@ -201,50 +215,77 @@ export default function Navbar() {
               <span className="hidden text-xl font-bold sm:inline-block">Nyord</span>
             </Link>
 
-            <MobileNav nav={navigationLinks} />
+            {user && <MobileNav nav={navigationLinks} />}
           </div>
 
           <div className="flex items-center justify-end gap-4">
-            <Link
-              to="/help"
-              className={cn(
-                buttonVariants({ variant: "outline", size: "icon" }),
-                "hidden h-8 w-8 sm:flex"
-              )}
-            >
-              <BellIcon className="h-4 w-4" />
-            </Link>
+            {user ? (
+              <>
+                <Link
+                  to="/help"
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "icon" }),
+                    "hidden h-8 w-8 sm:flex"
+                  )}
+                >
+                  <BellIcon className="h-4 w-4" />
+                </Link>
 
-            <Separator
-              orientation="vertical"
-              className="hidden h-5 sm:flex"
-            />
+                <Separator
+                  orientation="vertical"
+                  className="hidden h-5 sm:flex"
+                />
 
-            <UserProfileDropdown align="end" sizeClass="h-8 w-8" />
+                <UserProfileDropdown align="end" sizeClass="h-8 w-8" />
+              </>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/signin"
+                  className={cn(
+                    buttonVariants({ variant: "ghost" }),
+                    "h-9 px-4"
+                  )}
+                >
+                  Sign In
+                </Link>
+                <Link
+                  to="/signup"
+                  className={cn(
+                    buttonVariants({ variant: "default" }),
+                    "h-9 px-4"
+                  )}
+                >
+                  Sign Up
+                </Link>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="hidden w-full items-center justify-start pb-2 md:flex">
-          <NavigationMenu>
-            <NavigationMenuList>
-              {navigationLinks[0].items.map((link, index) => (
-                <NavigationMenuItem key={index} asChild>
-                  <Link
-                    to={link.href}
-                    className={cn(
-                      "flex flex-col gap-1 rounded-md px-3 py-1.5 text-sm font-medium transition-all outline-none",
-                      isActive(link.href)
-                        ? "text-foreground bg-accent"
-                        : "text-foreground/60 hover:bg-accent hover:text-foreground"
-                    )}
-                  >
-                    {link.label}
-                  </Link>
-                </NavigationMenuItem>
-              ))}
-            </NavigationMenuList>
-          </NavigationMenu>
-        </div>
+        {user && (
+          <div className="hidden w-full items-center justify-start pb-2 md:flex">
+            <NavigationMenu>
+              <NavigationMenuList>
+                {navigationLinks[0].items.map((link, index) => (
+                  <NavigationMenuItem key={index} asChild>
+                    <Link
+                      to={link.href}
+                      className={cn(
+                        "flex flex-col gap-1 rounded-md px-3 py-1.5 text-sm font-medium transition-all outline-none",
+                        isActive(link.href)
+                          ? "text-foreground bg-accent"
+                          : "text-foreground/60 hover:bg-accent hover:text-foreground"
+                      )}
+                    >
+                      {link.label}
+                    </Link>
+                  </NavigationMenuItem>
+                ))}
+              </NavigationMenuList>
+            </NavigationMenu>
+          </div>
+        )}
       </div>
     </header>
   );

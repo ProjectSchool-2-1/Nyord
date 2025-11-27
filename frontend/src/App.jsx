@@ -1,5 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
 import Navbar from './components/Navbar';
+import ProtectedRoute from './components/ProtectedRoute';
 import LandingPage from './pages/LandingPage';
 import Dashboard from './pages/Dashboard';
 import SignIn from './pages/SignIn';
@@ -16,23 +18,59 @@ import Help from './pages/Help';
 function App() {
   return (
     <Router>
-      <div className="min-h-screen bg-white dark:bg-gray-900">
-        <Navbar />
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/signin" element={<SignIn />} />
-          <Route path="/signup" element={<SignUp />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/cards" element={<ManageCards />} />
-          <Route path="/statements" element={<AccountStatements />} />
-          <Route path="/loans" element={<Loans />} />
-          <Route path="/fixed-deposits" element={<FixedDeposits />} />
-          <Route path="/stocks" element={<Stocks />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/help" element={<Help />} />
-        </Routes>
-      </div>
+      <AuthProvider>
+        <div className="min-h-screen bg-white dark:bg-gray-900">
+          <Navbar />
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/signin" element={<SignIn />} />
+            <Route path="/signup" element={<SignUp />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            
+            {/* Protected Routes */}
+            <Route path="/dashboard" element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/cards" element={
+              <ProtectedRoute>
+                <ManageCards />
+              </ProtectedRoute>
+            } />
+            <Route path="/statements" element={
+              <ProtectedRoute>
+                <AccountStatements />
+              </ProtectedRoute>
+            } />
+            <Route path="/loans" element={
+              <ProtectedRoute>
+                <Loans />
+              </ProtectedRoute>
+            } />
+            <Route path="/fixed-deposits" element={
+              <ProtectedRoute>
+                <FixedDeposits />
+              </ProtectedRoute>
+            } />
+            <Route path="/stocks" element={
+              <ProtectedRoute>
+                <Stocks />
+              </ProtectedRoute>
+            } />
+            <Route path="/profile" element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            } />
+            <Route path="/help" element={
+              <ProtectedRoute>
+                <Help />
+              </ProtectedRoute>
+            } />
+          </Routes>
+        </div>
+      </AuthProvider>
     </Router>
   );
 }

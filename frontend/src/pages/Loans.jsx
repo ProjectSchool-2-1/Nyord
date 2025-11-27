@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { loansAPI, authAPI } from '../services/api';
+import { jsPDF } from 'jspdf';
 
 const Loans = () => {
   const [loanAmount, setLoanAmount] = useState(250000);
@@ -13,11 +15,189 @@ const Loans = () => {
     return emi.toFixed(2);
   };
 
-  const activeLoans = [
-    { type: 'Home Loan', account: '****6789', emi: 18450.00, outstanding: 2150000, paid: 350000, total: 2500000, dueDate: 'Feb 5, 2024' },
-    { type: 'Personal Loan', account: '****4523', emi: 5200.00, outstanding: 145000, paid: 55000, total: 200000, dueDate: 'Feb 8, 2024' },
-    { type: 'Auto Loan', account: '****8901', emi: 12300.00, outstanding: 480000, paid: 220000, total: 700000, dueDate: 'Feb 10, 2024' },
-  ];
+  const [loans, setLoans] = useState([]);
+  const [applyLoading, setApplyLoading] = useState(false);
+  const [payLoading, setPayLoading] = useState(false);
+  const [selectedLoanId, setSelectedLoanId] = useState(null);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [customer, setCustomer] = useState({ name: '-', id: '-' });
+
+  useEffect(() => {
+    const fetchLoans = async () => {
+      try {
+        const data = await loansAPI.getMyLoans();
+        setLoans(data);
+      } catch (e) {
+        console.error('Failed to fetch loans', e);
+      }
+    };
+    const fetchUser = async () => {
+      try {
+        const u = await authAPI.getCurrentUser();
+        const name = u.full_name || u.username || 'Customer';
+        const id = String(u.id).padStart(5, '0');
+        setCustomer({ name, id });
+      } catch (e) {
+        // ignore
+      }
+    };
+    fetchLoans();
+    fetchUser();
+
+    // WebSocket live updates
+    const ws = new WebSocket('ws://localhost:8000/ws');
+    ws.onmessage = (msg) => {
+      try {
+        const event = JSON.parse(msg.data);
+        if (event.type === 'loan.created') {
+          // New loan appended
+          setLoans((prev) => {
+            if (prev.find((l) => l.id === event.loan_id)) return prev;
+            return [
+              ...prev,
+              {
+                id: event.loan_id,
+                user_id: event.user_id,
+                principal: event.principal,
+                emi: event.emi,
+                outstanding: event.outstanding,
+                status: 'ACTIVE',
+              },
+            ];
+          });
+        } else if (event.type === 'loan.payment') {
+          setLoans((prev) => prev.map((l) => (
+            l.id === event.loan_id
+              ? { ...l, outstanding: event.outstanding, status: event.status }
+              : l
+          )));
+        }
+      } catch {}
+    };
+    return () => ws.close();
+  }, []);
+
+  const handleApply = async () => {
+    setApplyLoading(true);
+    try {
+      const tenureMonths = loanTenure * 12;
+      const startDate = new Date();
+      const payload = {
+        loan_type: 'Home',
+        principal: loanAmount,
+        rate: interestRate,
+        tenure_months: tenureMonths,
+        start_date: startDate.toISOString().slice(0, 10),
+      };
+      const created = await loansAPI.applyLoan(payload);
+      setLoans((prev) => [...prev, created]);
+    } catch (e) {
+      console.error('Apply failed', e);
+    } finally {
+      setApplyLoading(false);
+    }
+  };
+
+  const handlePay = async () => {
+    if (!selectedLoanId || !paymentAmount) return;
+    setPayLoading(true);
+    try {
+      const updated = await loansAPI.payLoan(selectedLoanId, Number(paymentAmount));
+      setLoans((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
+      setPaymentAmount('');
+    } catch (e) {
+      console.error('Payment failed', e);
+    } finally {
+      setPayLoading(false);
+    }
+  };
+
+  const totalOutstanding = useMemo(() => loans.reduce((sum, l) => sum + (l.outstanding || 0), 0), [loans]);
+  const totalPaid = useMemo(() => loans.reduce((sum, l) => sum + (l.amount_paid || 0), 0), [loans]);
+  const totalPayable = useMemo(() => loans.reduce((sum, l) => sum + (l.total_payable || 0), 0), [loans]);
+  const totalPrincipal = useMemo(() => loans.reduce((sum, l) => sum + (l.principal || 0), 0), [loans]);
+  const activeLoansCount = useMemo(() => loans.filter(l => (l.status || '').toUpperCase() === 'ACTIVE').length, [loans]);
+
+  const formatCurrency = (n) => `$${(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const formatDatePretty = (iso) => {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+  const formatNowHeader = () => {
+    const d = new Date();
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = d.toLocaleString('en-US', { month: 'short' });
+    const year = d.getFullYear();
+    let hours = d.getHours();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${day} ${month} ${year}, ${hours}:${minutes} ${ampm}`;
+  };
+
+  const downloadSummaryPdf = () => {
+    const doc = new jsPDF();
+    let y = 20;
+    const line = (text, indent = 0, size = 12) => {
+      doc.setFontSize(size);
+      doc.text(text, 14 + indent, y);
+      y += 8;
+    };
+    const sep = () => { line('⸻', 0, 12); };
+
+    // Header
+    doc.setFontSize(18);
+    doc.text('Loan Summary Report', 14, y); y += 10;
+    doc.setFontSize(12);
+    line(`Generated: ${formatNowHeader()}`);
+    line(`Customer Name: ${customer.name}`);
+    line(`Customer ID: ${customer.id}`);
+    y += 2; sep(); y += 2;
+
+    // Overview
+    doc.setFontSize(16);
+    doc.text('Overall Loan Overview', 14, y); y += 8;
+    line(`• Total Active Loans: ${activeLoansCount}`, 8);
+    line(`• Total Principal Amount: ${formatCurrency(totalPrincipal)}`, 8);
+    line(`• Total Payable (with Interest): ${formatCurrency(totalPayable)}`, 8);
+    line(`• Total Paid Till Date: ${formatCurrency(totalPaid)}`, 8);
+    line(`• Total Outstanding: ${formatCurrency(totalOutstanding)}`, 8);
+    y += 2; sep(); y += 2;
+
+    // Breakdown
+    doc.setFontSize(16);
+    doc.text('Loan Breakdown', 14, y); y += 10;
+    doc.setFontSize(12);
+    loans.forEach((l, idx) => {
+      if (y > 260) { doc.addPage(); y = 20; }
+      const idTag = String(l.id || idx + 1).padStart(3, '0');
+      line(`${idx + 1}. ${l.loan_type || 'Loan'} #${idTag}`, 0, 13);
+      line(`• Loan Amount: ${formatCurrency(l.principal)}`, 8);
+      line(`• Interest Rate: ${(l.rate || 0)}%`, 8);
+      line(`• Tenure: ${(l.tenure_months || 0)} months`, 8);
+      line(`• Monthly EMI: ${formatCurrency(l.emi)}`, 8);
+      line(`• Start Date: ${formatDatePretty(l.start_date)}`, 8);
+      line(`• Next EMI: ${formatDatePretty(l.next_due_date)}`, 8);
+      line(`• Total Paid: ${formatCurrency(l.amount_paid)}`, 8);
+      line(`• Outstanding Balance: ${formatCurrency(l.outstanding)}`, 8);
+      line(`• Status: ${(l.status || '').toUpperCase()}`, 8);
+      y += 2; sep(); y += 2;
+    });
+
+    // Summary Notes
+    if (y > 240) { doc.addPage(); y = 20; }
+    doc.setFontSize(16);
+    doc.text('Summary Notes', 14, y); y += 10;
+    doc.setFontSize(12);
+    line('• All loans are active and on schedule.', 8);
+    line('• No missed EMI payments recorded so far.', 8);
+    line('• EMI reminders will be sent 5 days before due date.', 8);
+    line('• Consider enabling auto-debit for smoother repayment.', 8);
+
+    doc.save('loan-summary.pdf');
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -101,10 +281,11 @@ const Loans = () => {
                     Total Interest: ${((calculateEMI() * loanTenure * 12) - loanAmount).toFixed(2)}
                   </div>
                 </div>
-
-                <button className="w-full bg-white text-blue-600 py-3 rounded-xl font-semibold hover:bg-gray-100 transition-all">
-                  Apply for Loan
-                </button>
+                <div className="mt-4">
+                  <button onClick={handleApply} disabled={applyLoading} className="w-full bg-white text-blue-600 py-3 rounded-xl font-semibold hover:bg-gray-100 transition-all disabled:opacity-60">
+                    {applyLoading ? 'Applying…' : 'Apply for Loan'}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -139,78 +320,58 @@ const Loans = () => {
               <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Active Loans</h2>
               
               <div className="space-y-4">
-                {activeLoans.map((loan, idx) => (
+                {loans.map((loan, idx) => (
                   <div key={idx} className="p-4 rounded-xl bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer">
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        <h3 className="font-bold text-gray-900 dark:text-white">{loan.type}</h3>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">{loan.account}</div>
+                        <h3 className="font-bold text-gray-900 dark:text-white">{loan.loan_type || 'Loan'}</h3>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">{loan.account_ref || '—'}</div>
                       </div>
                       <span className="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">
-                        Active
+                        {loan.status}
                       </span>
                     </div>
                     
                     <div className="space-y-2 mb-3">
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600 dark:text-gray-400">Monthly EMI</span>
-                        <span className="font-semibold text-gray-900 dark:text-white">${loan.emi.toLocaleString()}</span>
+                        <span className="font-semibold text-gray-900 dark:text-white">${(loan.emi || 0).toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600 dark:text-gray-400">Outstanding</span>
-                        <span className="font-semibold text-gray-900 dark:text-white">${loan.outstanding.toLocaleString()}</span>
+                        <span className="font-semibold text-gray-900 dark:text-white">${(loan.outstanding || 0).toLocaleString()}</span>
                       </div>
                     </div>
 
                     <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2 mb-2">
                       <div
                         className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full"
-                        style={{ width: `${(loan.paid / loan.total) * 100}%` }}
+                        style={{ width: `${loan.total_payable ? (loan.amount_paid / loan.total_payable) * 100 : 0}%` }}
                       ></div>
                     </div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">
-                      ${loan.paid.toLocaleString()} / ${loan.total.toLocaleString()} paid
+                      ${(loan.amount_paid || 0).toLocaleString()} / {(loan.total_payable || 0).toLocaleString()} paid
                     </div>
                     
                     <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600 text-sm">
                       <span className="text-gray-600 dark:text-gray-400">Next EMI Due: </span>
-                      <span className="font-semibold text-gray-900 dark:text-white">{loan.dueDate}</span>
+                      <span className="font-semibold text-gray-900 dark:text-white">{loan.next_due_date || '—'}</span>
                     </div>
+                    {/* Removed Select button as requested */}
                   </div>
                 ))}
               </div>
             </div>
-
-            {/* Quick Actions */}
+            {/* Reports Section with PDF Download */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Quick Actions</h2>
-              
-              <div className="space-y-3">
-                <button className="w-full flex items-center justify-between p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all text-left">
-                  <div className="flex items-center">
-                    <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 mr-3">payments</span>
-                    <span className="font-medium text-gray-900 dark:text-white">Make Payment</span>
-                  </div>
-                  <span className="material-symbols-outlined text-gray-400">chevron_right</span>
-                </button>
-                
-                <button className="w-full flex items-center justify-between p-4 rounded-xl bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 transition-all text-left">
-                  <div className="flex items-center">
-                    <span className="material-symbols-outlined text-green-600 dark:text-green-400 mr-3">receipt_long</span>
-                    <span className="font-medium text-gray-900 dark:text-white">View Statements</span>
-                  </div>
-                  <span className="material-symbols-outlined text-gray-400">chevron_right</span>
-                </button>
-                
-                <button className="w-full flex items-center justify-between p-4 rounded-xl bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-all text-left">
-                  <div className="flex items-center">
-                    <span className="material-symbols-outlined text-purple-600 dark:text-purple-400 mr-3">support_agent</span>
-                    <span className="font-medium text-gray-900 dark:text-white">Contact Support</span>
-                  </div>
-                  <span className="material-symbols-outlined text-gray-400">chevron_right</span>
-                </button>
-              </div>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Reports</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Download a detailed loan summary report including totals and breakdown.</p>
+              <button onClick={downloadSummaryPdf} className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-all">
+                Download Loan Summary PDF
+              </button>
             </div>
+
+            {/* Quick Actions removed from Loans page as requested */}
           </div>
         </div>
       </div>

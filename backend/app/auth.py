@@ -10,6 +10,10 @@ def register_user(user_data, db: Session):
     existing = db.query(models.User).filter(models.User.username == user_data.username).first()
     if existing:
         raise HTTPException(status_code=400, detail="Username already exists")
+    
+    existing_email = db.query(models.User).filter(models.User.email == user_data.email).first()
+    if existing_email:
+        raise HTTPException(status_code=400, detail="Email already registered")
 
     hashed_pw = utils.hash_password(user_data.password)
 
@@ -17,6 +21,10 @@ def register_user(user_data, db: Session):
         username=user_data.username,
         email=user_data.email,
         hashed_password=hashed_pw,
+        full_name=user_data.full_name,
+        phone=user_data.phone,
+        date_of_birth=user_data.date_of_birth,
+        address=user_data.address,
     )
     db.add(new_user)
     db.commit()
@@ -31,4 +39,16 @@ def login_user(user_data, db: Session):
         raise HTTPException(status_code=400, detail="Invalid credentials")
 
     token = utils.create_access_token({"user_id": user.id})
-    return {"access_token": token, "token_type": "bearer"}
+    return {
+        "access_token": token, 
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "full_name": user.full_name,
+            "phone": user.phone,
+            "date_of_birth": str(user.date_of_birth) if user.date_of_birth else None,
+            "address": user.address
+        }
+    }

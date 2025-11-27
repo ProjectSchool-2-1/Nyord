@@ -1,4 +1,23 @@
+import { useEffect, useState } from 'react';
+import { fixedDepositsAPI } from '../services/api';
+
 const Dashboard = () => {
+  const [fdSummary, setFdSummary] = useState({ totalInvestment: 0, totalMaturity: 0, count: 0, avgRate: 0 });
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const fds = await fixedDepositsAPI.getMyFDs();
+        const totalInvestment = fds.reduce((s, fd) => s + (fd.principal || 0), 0);
+        const totalMaturity = fds.reduce((s, fd) => s + (fd.maturity_amount || 0), 0);
+        const avgRate = fds.length ? (fds.reduce((s, fd) => s + (fd.rate || 0), 0) / fds.length) : 0;
+        setFdSummary({ totalInvestment, totalMaturity, count: fds.length, avgRate });
+      } catch (e) {
+        // ignore if not logged in or no FDs
+      }
+    })();
+  }, []);
+
   const accounts = [
     { name: 'Savings Account', number: '****4829', balance: 12450.00, type: 'savings' },
     { name: 'Current Account', number: '****8192', balance: 5820.50, type: 'current' },
