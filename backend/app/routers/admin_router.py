@@ -414,16 +414,23 @@ async def approve_loan(
         # Disburse loan amount to user's account
         account = db.query(models.Account).filter(models.Account.user_id == loan.user_id).first()
         if account:
+            old_balance = account.balance
             account.balance += loan.principal
-            # Create a transaction record
+            # Create a transaction record (using existing Transaction model structure)
             transaction = models.Transaction(
-                transaction_type="credit",
+                dest_account=account.id,
                 amount=loan.principal,
-                description=f"Loan disbursement - {loan.loan_type}",
-                account_id=account.id
+                status="SUCCESS"
             )
             db.add(transaction)
-        message = f"Loan approved and disbursed for user {loan.owner.username}"
+            
+            # Also log in audit log for better tracking
+            audit_log_disburse = models.AuditLog(
+                event_type="LOAN_DISBURSAL",
+                message=f"Loan amount ${loan.principal} disbursed to account {account.account_number}. Balance: ${old_balance} -> ${account.balance}"
+            )
+            db.add(audit_log_disburse)
+        message = f"Loan approved and ${loan.principal} disbursed to user {loan.owner.username}'s account"
     elif approval_request.action.lower() == "reject":
         loan.approval_status = "rejected"
         loan.status = "rejected"

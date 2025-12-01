@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { adminAPI } from '../services/api';
 import KYCApprovalDashboard from '../components/KYCApprovalDashboard';
+import LoanApprovalDashboard from '../components/LoanApprovalDashboard';
+import CardApprovalDashboard from '../components/CardApprovalDashboard';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -103,6 +105,8 @@ const AdminDashboard = () => {
             {[
               { id: 'overview', name: 'Overview', icon: 'dashboard' },
               { id: 'kyc', name: 'KYC Approval', icon: 'verified_user' },
+              { id: 'loans', name: 'Loan Approvals', icon: 'trending_up' },
+              { id: 'cards', name: 'Card Approvals', icon: 'credit_card' },
               { id: 'users', name: 'Users', icon: 'people' },
               { id: 'transactions', name: 'Transactions', icon: 'swap_horiz' },
               { id: 'accounts', name: 'Accounts', icon: 'account_balance' }
@@ -174,6 +178,16 @@ const AdminDashboard = () => {
      
         {activeTab === 'kyc' && (
           <KYCApprovalDashboard />
+        )}
+
+        {/* Loan Approvals Tab */}
+        {activeTab === 'loans' && (
+          <LoanApprovalDashboard />
+        )}
+
+        {/* Card Approvals Tab */}
+        {activeTab === 'cards' && (
+          <CardApprovalDashboard />
         )}
 
       
