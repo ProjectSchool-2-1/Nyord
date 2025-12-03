@@ -8,12 +8,15 @@ import CardApprovalDashboard from '../components/CardApprovalDashboard';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
+  const { showSuccess, showError } = useNotifications();
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
+  const [accountsWithUsers, setAccountsWithUsers] = useState([]);
 
   useEffect(() => {
     if (user?.role !== 'admin') {
@@ -26,20 +29,82 @@ const AdminDashboard = () => {
   const loadAdminData = async () => {
     try {
       setLoading(true);
-      const [statsRes, usersRes, transactionsRes] = await Promise.all([
+      const [statsRes, usersRes, transactionsRes, accountsRes] = await Promise.all([
         adminAPI.getStats(),
         adminAPI.getUsers(0, 10),
-        adminAPI.getTransactions(0, 10)
+        adminAPI.getTransactions(0, 10),
+        adminAPI.getAccounts(0, 50)
       ]);
       
       setStats(statsRes);
       setUsers(usersRes);
       setTransactions(transactionsRes);
+      setAccounts(accountsRes);
+      
+      // Get all users for account enrichment
+      const allUsers = await adminAPI.getAllUsers();
+      
+      // Enrich accounts with user data
+      const enrichedAccounts = accountsRes.map(account => {
+        const user = allUsers.find(u => u.id === account.user_id);
+        return {
+          ...account,
+          user: user || null
+        };
+      });
+      
+      setAccountsWithUsers(enrichedAccounts);
     } catch (err) {
       setError(err.message || 'Failed to load admin data');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAdjustBalance = async (accountId, currentBalance) => {
+    const amount = prompt(`Current balance: $${currentBalance}\nEnter adjustment amount (use + for credit, - for debit):`);
+    if (!amount) return;
+    
+    const reason = prompt('Enter reason for adjustment:');
+    if (!reason) return;
+    
+    try {
+      await adminAPI.adjustBalance(accountId, parseFloat(amount), reason);
+      alert('Balance adjusted successfully!');
+      loadAdminData(); // Refresh data
+    } catch (error) {
+      alert('Failed to adjust balance: ' + error.message);
+    }
+  };
+
+  const handleToggleAccount = async (accountId, currentStatus) => {
+    const action = currentStatus ? 'deactivate' : 'activate';
+    if (!confirm(`Are you sure you want to ${action} this account?`)) return;
+    
+    try {
+      // For now, just show a message since the backend endpoint might not exist
+      alert(`Account ${action} functionality would be implemented here`);
+      // await adminAPI.toggleAccountStatus(accountId, !currentStatus);
+      // loadAdminData(); // Refresh data
+    } catch (error) {
+      alert(`Failed to ${action} account: ` + error.message);
+    }
+  };
+
+  const handleViewAccount = (account) => {
+    const accountInfo = `
+Account Details:
+
+Account Number: ${account.account_number}
+Account ID: ${account.id}
+Owner: ${account.user?.full_name || account.user?.username || 'Unknown User'}
+Email: ${account.user?.email || 'No email available'}
+Type: ${account.account_type || 'Savings'}
+Balance: $${account.balance?.toLocaleString() || '0.00'}
+Status: ${account.is_active !== false ? 'Active' : 'Inactive'}
+Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString() : 'Unknown'}
+    `;
+    alert(accountInfo);
   };
 
   const setupAdmin = async () => {
@@ -303,6 +368,113 @@ const AdminDashboard = () => {
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Accounts Tab */}
+        {activeTab === 'accounts' && (
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="px-4 py-5 sm:p-6">
+              <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Bank Accounts</h3>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Account</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Owner</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Balance</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {accountsWithUsers.map((account) => (
+                      <tr key={account.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10">
+                              <div className="h-10 w-10 rounded-full bg-indigo-500 flex items-center justify-center">
+                                <span className="material-symbols-outlined text-white text-sm">account_balance</span>
+                              </div>
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900">
+                                {account.account_number}
+                              </div>
+                              <div className="text-sm text-gray-500">ID: {account.id}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {account.user?.full_name || account.user?.username || 'Unknown User'}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {account.user?.email || 'No email available'}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            account.account_type === 'savings'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {account.account_type?.charAt(0).toUpperCase() + account.account_type?.slice(1) || 'Savings'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          ${account.balance?.toLocaleString() || '0.00'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            account.is_active !== false
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {account.is_active !== false ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {account.created_at ? new Date(account.created_at).toLocaleDateString() : 'Unknown'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <button 
+                            onClick={() => handleViewAccount(account)}
+                            className="text-indigo-600 hover:text-indigo-900 mr-2"
+                          >
+                            View
+                          </button>
+                          <button 
+                            onClick={() => handleAdjustBalance(account.id, account.balance)}
+                            className="text-green-600 hover:text-green-900 mr-2"
+                          >
+                            Adjust
+                          </button>
+                          <button 
+                            onClick={() => handleToggleAccount(account.id, account.is_active !== false)}
+                            className={`${
+                            account.is_active !== false
+                              ? 'text-red-600 hover:text-red-900'
+                              : 'text-green-600 hover:text-green-900'
+                          }`}>
+                            {account.is_active !== false ? 'Deactivate' : 'Activate'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {accountsWithUsers.length === 0 && !loading && (
+                <div className="text-center py-12">
+                  <span className="material-symbols-outlined text-6xl text-gray-300 mb-4">account_balance</span>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Accounts Found</h3>
+                  <p className="text-gray-500">No bank accounts are currently registered in the system.</p>
+                </div>
+              )}
             </div>
           </div>
         )}

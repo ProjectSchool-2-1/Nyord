@@ -1,5 +1,5 @@
-const API_BASE_URL = 'http://localhost:8000';
-// const API_BASE_URL = 'httpss://taksari.me/api';
+const BASE_URL = 'http://localhost:8000';
+// const BASE_URL = 'httpss://taksari.me/api';
 
 // Get token from localStorage
 const getToken = () => localStorage.getItem('token');
@@ -28,7 +28,7 @@ const apiRequest = async (endpoint, options = {}) => {
   };
 
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+    const response = await fetch(`${BASE_URL}${endpoint}`, config);
     
     if (!response.ok) {
       const error = await response.json();
