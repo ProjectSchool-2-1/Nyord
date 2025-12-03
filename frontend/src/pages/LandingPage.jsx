@@ -13,7 +13,7 @@ const LandingPage = () => {
         textBlend={false}
       >
         {/* Content that appears after scroll expansion */}
-        <div className="text-center text-white space-y-6">
+        {/* <div className="text-center text-white space-y-6">
           <h3 className="text-3xl font-bold">Experience Modern Banking</h3>
           <p className="text-xl opacity-90 max-w-2xl mx-auto">
             Join over 1 million customers who trust Nyord for seamless digital banking, instant transfers, and smart financial tools.
@@ -33,7 +33,7 @@ const LandingPage = () => {
               Sign In
             </Link>
           </div>
-        </div>
+        </div> */}
       </ScrollExpandMedia>
 
       {/* Xapo-Style Scroll Section */}
