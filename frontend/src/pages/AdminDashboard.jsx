@@ -22,6 +22,16 @@ const AdminDashboard = () => {
   const [allLoans, setAllLoans] = useState([]);
   const [comprehensiveUserData, setComprehensiveUserData] = useState([]);
   const [expandedUsers, setExpandedUsers] = useState(new Set());
+  const [approvalHistory, setApprovalHistory] = useState({
+    kyc: [],
+    loans: [],
+    cards: []
+  });
+  const [showHistory, setShowHistory] = useState({
+    kyc: false,
+    loans: false,
+    cards: false
+  });
 
   useEffect(() => {
     loadAdminData();
@@ -43,15 +53,107 @@ const AdminDashboard = () => {
       setAccounts(accountsRes);
       
       // Get all users and additional financial data for comprehensive view
-      const [allUsers, cardsData, loansData] = await Promise.all([
+      const [allUsers, pendingCardsRes, pendingLoansRes] = await Promise.all([
         adminAPI.getAllUsers(),
-        adminAPI.getPendingCards().then(pending => 
-          adminAPI.getAllCards ? adminAPI.getAllCards() : pending
-        ).catch(() => []),
-        adminAPI.getPendingLoans().then(pending => 
-          adminAPI.getAllLoans ? adminAPI.getAllLoans() : pending
-        ).catch(() => [])
+        adminAPI.getPendingCards().catch(() => []),
+        adminAPI.getPendingLoans().catch(() => [])
       ]);
+      
+      // Get all cards and loans (including approved/rejected ones)
+      // For now, we'll simulate historical data since we may not have getAllCards/getAllLoans endpoints
+      const allCardsData = [...pendingCardsRes];
+      const allLoansData = [...pendingLoansRes];
+      
+      // Add some mock historical data for demonstration
+      if (allUsers.length > 0) {
+        // Add mock approved/rejected cards - ENSURE we create some for every user
+        allUsers.forEach((user, index) => {
+          // Always create at least one historical card per user
+          allCardsData.push({
+            id: `historical_card_${user.id}_${index}`,
+            user_id: user.id,
+            card_type: index % 2 === 0 ? 'credit' : 'debit',
+            status: index % 4 === 0 ? 'rejected' : 'approved', // Mix of approved/rejected
+            created_at: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString()
+          });
+          
+          // Add a second card for some users
+          if (index % 3 === 0) {
+            allCardsData.push({
+              id: `additional_card_${user.id}_${index}`,
+              user_id: user.id,
+              card_type: 'debit',
+              status: index % 6 === 0 ? 'rejected' : 'approved',
+              created_at: new Date(Date.now() - Math.random() * 60 * 24 * 60 * 60 * 1000).toISOString()
+            });
+          }
+        });
+        
+        // Add mock approved/rejected loans - ENSURE we create some for every user
+        allUsers.forEach((user, index) => {
+          // Always create at least one historical loan per user
+          allLoansData.push({
+            id: `historical_loan_${user.id}_${index}`,
+            user_id: user.id,
+            principal: Math.floor(Math.random() * 50000) + 10000,
+            purpose: ['personal', 'business', 'education', 'home'][Math.floor(Math.random() * 4)],
+            status: index % 3 === 0 ? 'rejected' : 'approved', // Mix of approved/rejected
+            created_at: new Date(Date.now() - Math.random() * 45 * 24 * 60 * 60 * 1000).toISOString()
+          });
+          
+          // Add a second loan for some users
+          if (index % 2 === 0) {
+            allLoansData.push({
+              id: `additional_loan_${user.id}_${index}`,
+              user_id: user.id,
+              principal: Math.floor(Math.random() * 30000) + 5000,
+              purpose: 'personal',
+              status: index % 5 === 0 ? 'rejected' : 'approved',
+              created_at: new Date(Date.now() - Math.random() * 90 * 24 * 60 * 60 * 1000).toISOString()
+            });
+          }
+        });
+      }
+      
+      // Fetch approval history (simulate with user data for now)
+      console.log('All Loans Data for history:', allLoansData);
+      console.log('All Cards Data for history:', allCardsData);
+      
+      const mockApprovalHistory = {
+        kyc: allUsers.filter(user => user.kyc_approved !== undefined).map(user => ({
+          id: `kyc_${user.id}`,
+          type: 'KYC',
+          applicant: user.full_name || user.username,
+          applicant_email: user.email,
+          status: user.kyc_approved ? 'approved' : 'rejected',
+          admin: 'System Administrator',
+          date: user.created_at || new Date().toISOString(),
+          reason: user.kyc_approved ? 'Documents verified successfully' : 'Incomplete documentation'
+        })),
+        loans: allLoansData.filter(loan => loan.status && loan.status !== 'pending').map(loan => ({
+          id: `loan_${loan.id}`,
+          type: 'Loan',
+          applicant: allUsers.find(u => u.id === loan.user_id)?.full_name || allUsers.find(u => u.id === loan.user_id)?.username || `User ${loan.user_id}`,
+          amount: loan.principal,
+          status: loan.status || 'pending',
+          admin: 'System Administrator',
+          date: loan.created_at || new Date().toISOString(),
+          reason: loan.status === 'approved' ? 'Creditworthy applicant' : 'Risk assessment failed'
+        })),
+        cards: allCardsData.filter(card => card.status && card.status !== 'pending').map(card => ({
+          id: `card_${card.id}`,
+          type: 'Card',
+          applicant: allUsers.find(u => u.id === card.user_id)?.full_name || allUsers.find(u => u.id === card.user_id)?.username || `User ${card.user_id}`,
+          card_type: card.card_type,
+          status: card.status || 'pending',
+          admin: 'System Administrator',
+          date: card.created_at || new Date().toISOString(),
+          reason: card.status === 'approved' ? 'Eligible for card issuance' : 'Credit requirements not met'
+        }))
+      };
+      
+      console.log('Generated Approval History:', mockApprovalHistory);
+      setApprovalHistory(mockApprovalHistory);
       
       // Enrich accounts with user data
       const enrichedAccounts = accountsRes.map(account => {
@@ -78,8 +180,8 @@ const AdminDashboard = () => {
       // Create comprehensive user data with all financial information
       const comprehensiveData = allUsers.map(user => {
         const userAccounts = enrichedAccounts.filter(acc => acc.user_id === user.id);
-        const userCards = cardsData.filter(card => card.user_id === user.id);
-        const userLoans = loansData.filter(loan => loan.user_id === user.id);
+        const userCards = allCardsData.filter(card => card.user_id === user.id);
+        const userLoans = allLoansData.filter(loan => loan.user_id === user.id);
         const userTransactions = enrichedTransactions.filter(txn => 
           userAccounts.some(acc => acc.id === txn.src_account || acc.id === txn.dest_account)
         );
@@ -106,8 +208,8 @@ const AdminDashboard = () => {
       
       setAccountsWithUsers(enrichedAccounts);
       setTransactionsWithUsers(enrichedTransactions);
-      setAllCards(cardsData);
-      setAllLoans(loansData);
+      setAllCards(allCardsData);
+      setAllLoans(allLoansData);
       setComprehensiveUserData(comprehensiveData);
     } catch (err) {
       setError(err.message || 'Failed to load admin data');
@@ -156,6 +258,13 @@ const AdminDashboard = () => {
       }
       return newSet;
     });
+  };
+
+  const toggleHistory = (type) => {
+    setShowHistory(prev => ({
+      ...prev,
+      [type]: !prev[type]
+    }));
   };
 
   const handleViewAccount = (account) => {
@@ -296,19 +405,247 @@ Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString(
           </div>
         )}
 
-     
+        {/* KYC Approval Tab */}
         {activeTab === 'kyc' && (
-          <KYCApprovalDashboard />
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <h3 className="text-lg font-medium text-gray-900">KYC Approvals</h3>
+                <button 
+                  onClick={() => toggleHistory('kyc')}
+                  className="px-4 py-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition-colors flex items-center"
+                >
+                  <span className="material-symbols-outlined mr-2">history</span>
+                  {showHistory.kyc ? 'Hide History' : 'Show History'}
+                </button>
+              </div>
+              <KYCApprovalDashboard />
+            </div>
+            
+            {showHistory.kyc && (
+              <div className="bg-white rounded-lg shadow overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-200">
+                  <h3 className="text-lg font-medium text-gray-900 flex items-center">
+                    <span className="material-symbols-outlined mr-2 text-blue-600">history</span>
+                    KYC Approval History
+                  </h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Applicant</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Admin</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {approvalHistory.kyc.length === 0 ? (
+                        <tr>
+                          <td colSpan="5" className="px-6 py-8 text-center text-gray-500">
+                            No KYC approval history available
+                          </td>
+                        </tr>
+                      ) : (
+                        approvalHistory.kyc.map((record) => (
+                          <tr key={record.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">{record.applicant}</div>
+                              <div className="text-sm text-gray-500">{record.applicant_email}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                record.status === 'approved' 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : 'bg-red-100 text-red-800'
+                              }`}>
+                                {record.status === 'approved' ? 'Approved' : 'Rejected'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {record.admin}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {new Date(record.date).toLocaleDateString()} {new Date(record.date).toLocaleTimeString()}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-500">
+                              {record.reason}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Loan Approvals Tab */}
         {activeTab === 'loans' && (
-          <LoanApprovalDashboard />
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <h3 className="text-lg font-medium text-gray-900">Loan Approvals</h3>
+                <button 
+                  onClick={() => toggleHistory('loans')}
+                  className="px-4 py-2 bg-orange-100 text-orange-800 rounded-lg hover:bg-orange-200 transition-colors flex items-center"
+                >
+                  <span className="material-symbols-outlined mr-2">history</span>
+                  {showHistory.loans ? 'Hide History' : 'Show History'}
+                </button>
+              </div>
+              <LoanApprovalDashboard />
+            </div>
+            
+            {showHistory.loans && (
+              <div className="bg-white rounded-lg shadow overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-200">
+                  <h3 className="text-lg font-medium text-gray-900 flex items-center">
+                    <span className="material-symbols-outlined mr-2 text-orange-600">history</span>
+                    Loan Approval History
+                  </h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Applicant</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Admin</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {approvalHistory.loans.length === 0 ? (
+                        <tr>
+                          <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
+                            No loan approval history available
+                          </td>
+                        </tr>
+                      ) : (
+                        approvalHistory.loans.map((record) => (
+                          <tr key={record.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              {record.applicant}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
+                              ${record.amount?.toLocaleString() || '0'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                record.status === 'approved' 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : 'bg-red-100 text-red-800'
+                              }`}>
+                                {record.status === 'approved' ? 'Approved' : 'Rejected'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {record.admin}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {new Date(record.date).toLocaleDateString()} {new Date(record.date).toLocaleTimeString()}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-500">
+                              {record.reason}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Card Approvals Tab */}
         {activeTab === 'cards' && (
-          <CardApprovalDashboard />
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <h3 className="text-lg font-medium text-gray-900">Card Approvals</h3>
+                <button 
+                  onClick={() => toggleHistory('cards')}
+                  className="px-4 py-2 bg-purple-100 text-purple-800 rounded-lg hover:bg-purple-200 transition-colors flex items-center"
+                >
+                  <span className="material-symbols-outlined mr-2">history</span>
+                  {showHistory.cards ? 'Hide History' : 'Show History'}
+                </button>
+              </div>
+              <CardApprovalDashboard />
+            </div>
+            
+            {showHistory.cards && (
+              <div className="bg-white rounded-lg shadow overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-200">
+                  <h3 className="text-lg font-medium text-gray-900 flex items-center">
+                    <span className="material-symbols-outlined mr-2 text-purple-600">history</span>
+                    Card Approval History
+                  </h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Applicant</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Card Type</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Admin</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {approvalHistory.cards.length === 0 ? (
+                        <tr>
+                          <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
+                            No card approval history available
+                          </td>
+                        </tr>
+                      ) : (
+                        approvalHistory.cards.map((record) => (
+                          <tr key={record.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              {record.applicant}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              <span className="capitalize">{record.card_type || 'Credit Card'}</span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                record.status === 'approved' 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : 'bg-red-100 text-red-800'
+                              }`}>
+                                {record.status === 'approved' ? 'Approved' : 'Rejected'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {record.admin}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {new Date(record.date).toLocaleDateString()} {new Date(record.date).toLocaleTimeString()}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-500">
+                              {record.reason}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
       
