@@ -208,6 +208,7 @@ const getNavigationLinks = (user) => [
           ]
         : [
             { href: "/dashboard", label: "Dashboard" },
+            { href: "/qr-payment", label: "QR Payment" },
             { href: "/cards", label: "Cards" },
             { href: "/statements", label: "Statements" },
             { href: "/loans", label: "Loans" },

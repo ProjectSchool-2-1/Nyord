@@ -5,35 +5,34 @@ from typing import Union
 import hashlib
 import json
 
-def generate_user_qr_code(user_id: int, user_data: dict = None) -> str:
+def generate_user_qr_code(user_id: int, user_data: dict = None, base_url: str = "http://localhost:3000") -> str:
     """
-    Generate a unique QR code for a user that will always be the same for the same user_id.
+    Generate a unique QR code for a user that contains a payment URL.
+    When scanned, it redirects to the payment page.
     
     Args:
         user_id: The user's unique ID
         user_data: Optional dictionary with user info like name, email etc.
+        base_url: Base URL of the frontend application
     
     Returns:
         Base64 encoded PNG image of the QR code
     """
-    # Create consistent QR data using user_id as the primary identifier
-    qr_data = {
-        "user_id": user_id,
-        "app": "Nyord Banking",
-        "type": "user_profile",
-        "timestamp": "permanent"  # Static to ensure same QR always
-    }
+    # Generate secure hash for the user
+    user_hash = generate_user_qr_hash(user_id)
     
-    # Add user data if provided
+    # Create payment URL that works with external scanners
+    payment_url = f"{base_url}/pay?to={user_id}&hash={user_hash}"
+    
+    # Add user info as URL parameters for better UX
     if user_data:
-        qr_data.update({
-            "name": user_data.get("full_name", ""),
-            "email": user_data.get("email", ""),
-            "username": user_data.get("username", "")
-        })
+        if user_data.get("username"):
+            payment_url += f"&username={user_data['username']}"
+        if user_data.get("full_name"):
+            payment_url += f"&name={user_data['full_name'].replace(' ', '%20')}"
     
-    # Convert to JSON string for QR encoding (sorted keys for consistency)
-    qr_content = json.dumps(qr_data, sort_keys=True)
+    # QR content is now a simple URL
+    qr_content = payment_url
     
     # Create QR code with specific settings for consistency
     qr = qrcode.QRCode(

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { profileAPI } from '../services/api';
+import QRCodeDisplay from '../components/QRCodeDisplay';
 
 const Profile = () => {
   const { user: authUser, updateUser } = useAuth();
@@ -226,6 +227,18 @@ const Profile = () => {
               >
                 <span className="material-symbols-outlined mr-3">security</span>
                 Security
+              </button>
+              
+              <button
+                onClick={() => setActiveTab('qrcode')}
+                className={`w-full flex items-center px-4 py-3 rounded-lg transition-all ${
+                  activeTab === 'qrcode'
+                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                <span className="material-symbols-outlined mr-3">qr_code</span>
+                My QR Code
               </button>
             </div>
           </div>
@@ -711,6 +724,17 @@ const Profile = () => {
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* QR Code Tab */}
+            {activeTab === 'qrcode' && (
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">My QR Code</h2>
+                <p className="text-gray-600 dark:text-gray-400 mb-6">
+                  Your unique QR code contains your profile information and can be shared with trusted parties for quick identification.
+                </p>
+                <QRCodeDisplay className="max-w-2xl" />
               </div>
             )}
           </div>

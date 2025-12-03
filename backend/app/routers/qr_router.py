@@ -1,10 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 from ..database import get_db
 from ..models import User
 from ..utils import get_current_user
 from ..qr_utils import generate_user_qr_code, generate_user_qr_hash, verify_qr_code
 from typing import Optional
+
+class QRDecodeRequest(BaseModel):
+    qr_data: str
 
 router = APIRouter(prefix="/qr", tags=["QR Codes"])
 
@@ -37,8 +41,8 @@ def generate_qr_for_user(
         "username": target_user.username
     }
     
-    # Generate QR code
-    qr_code_base64 = generate_user_qr_code(target_user.id, user_data)
+    # Generate QR code with payment URL
+    qr_code_base64 = generate_user_qr_code(target_user.id, user_data, "http://localhost:3000")
     qr_hash = generate_user_qr_hash(target_user.id)
     
     return {
@@ -86,6 +90,90 @@ def verify_user_qr(
         "verified_by": current_user.id,
         "message": "QR verification completed"
     }
+
+@router.post("/decode")
+def decode_qr_data(
+    request: QRDecodeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Decode QR code data and extract user information for transactions.
+    This endpoint processes the raw QR code text (URL) and returns user details.
+    """
+    try:
+        from urllib.parse import urlparse, parse_qs
+        
+        # Get the QR data from request body
+        qr_data = request.qr_data.strip()
+        
+        # Parse the QR code URL
+        if qr_data.startswith("http"):
+            parsed_url = urlparse(qr_data)
+            query_params = parse_qs(parsed_url.query)
+            
+            # Extract user ID and hash from URL parameters
+            user_id = query_params.get("to", [None])[0]
+            qr_hash = query_params.get("hash", [None])[0]
+            
+            if not user_id or not qr_hash:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid QR code format - missing parameters"
+                )
+            
+            user_id = int(user_id)
+        else:
+            # Try to parse as JSON (old format)
+            import json
+            qr_json = json.loads(qr_data)
+            user_id = qr_json.get("user_id")
+            qr_hash = qr_json.get("qr_hash")
+            
+            if not user_id or not qr_hash:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid QR code format"
+                )
+        
+        # Get user details
+        target_user = db.query(User).filter(User.id == user_id).first()
+        if not target_user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        # Verify the QR hash
+        expected_hash = generate_user_qr_hash(user_id)
+        if qr_hash != expected_hash:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or tampered QR code"
+            )
+        
+        return {
+            "valid": True,
+            "recipient": {
+                "user_id": target_user.id,
+                "username": target_user.username,
+                "full_name": target_user.full_name,
+                "email": target_user.email
+            },
+            "decoded_by": current_user.id,
+            "can_transact": target_user.id != current_user.id  # Can't send money to yourself
+        }
+        
+    except (json.JSONDecodeError, ValueError) as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid QR code format"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"QR decode failed: {str(e)}"
+        )
 
 @router.get("/admin/all-users")
 def get_all_user_qr_info(

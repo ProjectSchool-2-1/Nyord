@@ -17,6 +17,8 @@ import Help from './pages/Help';
 import Transfer from './pages/Transfer';
 import AdminDashboard from './pages/AdminDashboard';
 import Notifications from './pages/Notifications';
+import QRPayment from './pages/QRPayment';
+import PaymentPage from './pages/PaymentPage';
 
 function App() {
   return (
@@ -112,6 +114,12 @@ function App() {
                 <Notifications />
               </ProtectedRoute>
             } />
+            <Route path="/qr-payment" element={
+              <ProtectedRoute>
+                <QRPayment />
+              </ProtectedRoute>
+            } />
+            <Route path="/pay" element={<PaymentPage />} />
           </Routes>
           </div>
         </NotificationProvider>
