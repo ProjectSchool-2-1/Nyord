@@ -17,14 +17,15 @@ const AdminDashboard = () => {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
   const [accountsWithUsers, setAccountsWithUsers] = useState([]);
+  const [transactionsWithUsers, setTransactionsWithUsers] = useState([]);
+  const [allCards, setAllCards] = useState([]);
+  const [allLoans, setAllLoans] = useState([]);
+  const [comprehensiveUserData, setComprehensiveUserData] = useState([]);
+  const [expandedUsers, setExpandedUsers] = useState(new Set());
 
   useEffect(() => {
-    if (user?.role !== 'admin') {
-      setError('Access denied: Admin privileges required');
-      return;
-    }
     loadAdminData();
-  }, [user]);
+  }, []);
 
   const loadAdminData = async () => {
     try {
@@ -41,8 +42,16 @@ const AdminDashboard = () => {
       setTransactions(transactionsRes);
       setAccounts(accountsRes);
       
-      // Get all users for account enrichment
-      const allUsers = await adminAPI.getAllUsers();
+      // Get all users and additional financial data for comprehensive view
+      const [allUsers, cardsData, loansData] = await Promise.all([
+        adminAPI.getAllUsers(),
+        adminAPI.getPendingCards().then(pending => 
+          adminAPI.getAllCards ? adminAPI.getAllCards() : pending
+        ).catch(() => []),
+        adminAPI.getPendingLoans().then(pending => 
+          adminAPI.getAllLoans ? adminAPI.getAllLoans() : pending
+        ).catch(() => [])
+      ]);
       
       // Enrich accounts with user data
       const enrichedAccounts = accountsRes.map(account => {
@@ -53,7 +62,53 @@ const AdminDashboard = () => {
         };
       });
       
+      // Enrich transactions with user data
+      const enrichedTransactions = transactionsRes.map(transaction => {
+        const srcAccount = enrichedAccounts.find(acc => acc.id === transaction.src_account);
+        const destAccount = enrichedAccounts.find(acc => acc.id === transaction.dest_account);
+        return {
+          ...transaction,
+          srcUser: srcAccount?.user || null,
+          destUser: destAccount?.user || null,
+          srcAccountNumber: srcAccount?.account_number || transaction.src_account,
+          destAccountNumber: destAccount?.account_number || transaction.dest_account
+        };
+      });
+      
+      // Create comprehensive user data with all financial information
+      const comprehensiveData = allUsers.map(user => {
+        const userAccounts = enrichedAccounts.filter(acc => acc.user_id === user.id);
+        const userCards = cardsData.filter(card => card.user_id === user.id);
+        const userLoans = loansData.filter(loan => loan.user_id === user.id);
+        const userTransactions = enrichedTransactions.filter(txn => 
+          userAccounts.some(acc => acc.id === txn.src_account || acc.id === txn.dest_account)
+        );
+        
+        const totalBalance = userAccounts.reduce((sum, acc) => sum + (acc.balance || 0), 0);
+        const totalLoanAmount = userLoans.reduce((sum, loan) => sum + (loan.principal || 0), 0);
+        
+        return {
+          user,
+          accounts: userAccounts,
+          cards: userCards,
+          loans: userLoans,
+          transactions: userTransactions,
+          summary: {
+            totalBalance,
+            totalLoanAmount,
+            accountsCount: userAccounts.length,
+            cardsCount: userCards.length,
+            loansCount: userLoans.length,
+            transactionsCount: userTransactions.length
+          }
+        };
+      });
+      
       setAccountsWithUsers(enrichedAccounts);
+      setTransactionsWithUsers(enrichedTransactions);
+      setAllCards(cardsData);
+      setAllLoans(loansData);
+      setComprehensiveUserData(comprehensiveData);
     } catch (err) {
       setError(err.message || 'Failed to load admin data');
     } finally {
@@ -91,6 +146,18 @@ const AdminDashboard = () => {
     }
   };
 
+  const toggleUserExpansion = (userId) => {
+    setExpandedUsers(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(userId)) {
+        newSet.delete(userId);
+      } else {
+        newSet.add(userId);
+      }
+      return newSet;
+    });
+  };
+
   const handleViewAccount = (account) => {
     const accountInfo = `
 Account Details:
@@ -120,25 +187,9 @@ Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString(
     }
   };
 
-  if (user?.role !== 'admin') {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6 text-center">
-          <div className="mb-4">
-            <span className="material-symbols-outlined text-6xl text-red-500 mb-4">lock</span>
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-          <p className="text-gray-600 mb-6">You need admin privileges to access this page.</p>
-          <button 
-            onClick={setupAdmin}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Setup Admin Account
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Debug: Log user info to console
+  console.log('AdminDashboard - Current user:', user);
+  console.log('AdminDashboard - User role:', user?.role);
 
   if (loading) {
     return (
@@ -335,16 +386,26 @@ Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString(
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {transactions.map((transaction) => (
+                    {transactionsWithUsers.map((transaction) => (
                       <tr key={transaction.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           #{transaction.id}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {transaction.src_account}
+                          <div className="text-sm font-medium text-gray-900">
+                            {transaction.srcUser?.full_name || transaction.srcUser?.username || 'Unknown User'}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {transaction.srcAccountNumber}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {transaction.dest_account}
+                          <div className="text-sm font-medium text-gray-900">
+                            {transaction.destUser?.full_name || transaction.destUser?.username || 'Unknown User'}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {transaction.destAccountNumber}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           ${transaction.amount.toLocaleString()}
@@ -372,109 +433,284 @@ Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString(
           </div>
         )}
 
-        {/* Accounts Tab */}
+        {/* Accounts Tab - Comprehensive Financial Overview */}
         {activeTab === 'accounts' && (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Bank Accounts</h3>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Account</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Owner</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Balance</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {accountsWithUsers.map((account) => (
-                      <tr key={account.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="flex-shrink-0 h-10 w-10">
-                              <div className="h-10 w-10 rounded-full bg-indigo-500 flex items-center justify-center">
-                                <span className="material-symbols-outlined text-white text-sm">account_balance</span>
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="px-4 py-5 sm:p-6">
+                <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Complete Financial Overview - All Users</h3>
+                
+                {comprehensiveUserData.length === 0 && !loading ? (
+                  <div className="text-center py-12">
+                    <span className="material-symbols-outlined text-6xl text-gray-300 mb-4">account_balance</span>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Financial Data Found</h3>
+                    <p className="text-gray-500">No users with financial data are currently registered in the system.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {comprehensiveUserData.map((userData, index) => {
+                      const isExpanded = expandedUsers.has(userData.user.id);
+                      return (
+                        <div key={userData.user.id} className={`border border-gray-200 rounded-lg bg-white transition-all duration-200 ${isExpanded ? 'shadow-lg' : 'hover:shadow-md'}`}>
+                          {/* Clickable User Header */}
+                          <div 
+                            className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                            onClick={() => toggleUserExpansion(userData.user.id)}
+                          >
+                            <div className="flex items-center space-x-4">
+                              <div className="w-12 h-12 bg-indigo-500 rounded-full flex items-center justify-center">
+                                <span className="text-white font-semibold text-lg">
+                                  {userData.user.full_name?.charAt(0)?.toUpperCase() || userData.user.username?.charAt(0)?.toUpperCase() || 'U'}
+                                </span>
+                              </div>
+                              <div>
+                                <h4 className="text-lg font-semibold text-gray-900 flex items-center">
+                                  {userData.user.full_name || userData.user.username || `User ${userData.user.id}`}
+                                  <span className="material-symbols-outlined ml-2 text-gray-400 transition-transform duration-200 ${
+                                    isExpanded ? 'rotate-180' : ''
+                                  }">expand_more</span>
+                                </h4>
+                                <p className="text-sm text-gray-500">{userData.user.email || 'No email'}</p>
+                                <div className="flex space-x-4 text-xs text-gray-400 mt-1">
+                                  <span>{userData.summary.accountsCount} accounts</span>
+                                  <span>{userData.summary.cardsCount} cards</span>
+                                  <span>{userData.summary.loansCount} loans</span>
+                                  <span>{userData.summary.transactionsCount} transactions</span>
+                                </div>
                               </div>
                             </div>
-                            <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900">
-                                {account.account_number}
+                            <div className="text-right">
+                              <div className="text-2xl font-bold text-green-600">
+                                ${userData.summary.totalBalance.toLocaleString()}
                               </div>
-                              <div className="text-sm text-gray-500">ID: {account.id}</div>
+                              <div className="text-sm text-gray-500">Total Balance</div>
+                              <div className="text-xs text-blue-600 mt-1">
+                                {isExpanded ? 'Click to collapse' : 'Click to expand'}
+                              </div>
                             </div>
                           </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">
-                            {account.user?.full_name || account.user?.username || 'Unknown User'}
+
+                          {/* Expanded Details - Only show when user is expanded */}
+                          {isExpanded && (
+                            <div className="px-4 pb-4 border-t border-gray-100 bg-gray-50">
+                              {/* Summary Cards */}
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 mt-4">
+                                <div className="bg-white rounded-lg p-4 border border-blue-200">
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <div className="text-2xl font-bold text-blue-600">{userData.summary.accountsCount}</div>
+                                      <div className="text-sm text-gray-500">Accounts</div>
+                                    </div>
+                                    <span className="material-symbols-outlined text-blue-500">account_balance</span>
+                                  </div>
+                                </div>
+                                <div className="bg-white rounded-lg p-4 border border-purple-200">
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <div className="text-2xl font-bold text-purple-600">{userData.summary.cardsCount}</div>
+                                      <div className="text-sm text-gray-500">Cards</div>
+                                    </div>
+                                    <span className="material-symbols-outlined text-purple-500">credit_card</span>
+                                  </div>
+                                </div>
+                                <div className="bg-white rounded-lg p-4 border border-orange-200">
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <div className="text-2xl font-bold text-orange-600">{userData.summary.loansCount}</div>
+                                      <div className="text-sm text-gray-500">Loans</div>
+                                    </div>
+                                    <span className="material-symbols-outlined text-orange-500">trending_up</span>
+                                  </div>
+                                </div>
+                                <div className="bg-white rounded-lg p-4 border border-green-200">
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <div className="text-2xl font-bold text-green-600">{userData.summary.transactionsCount}</div>
+                                      <div className="text-sm text-gray-500">Transactions</div>
+                                    </div>
+                                    <span className="material-symbols-outlined text-green-500">swap_horiz</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                        {/* Detailed Sections */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          {/* Accounts Section */}
+                          <div className="bg-white rounded-lg border">
+                            <div className="px-4 py-3 border-b border-gray-200">
+                              <h5 className="text-md font-medium text-gray-900 flex items-center">
+                                <span className="material-symbols-outlined mr-2 text-blue-500">account_balance</span>
+                                Accounts ({userData.accounts.length})
+                              </h5>
+                            </div>
+                            <div className="p-4 space-y-3 max-h-48 overflow-y-auto">
+                              {userData.accounts.length === 0 ? (
+                                <p className="text-sm text-gray-500 text-center py-4">No accounts</p>
+                              ) : (
+                                userData.accounts.map(account => (
+                                  <div key={account.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                                    <div>
+                                      <div className="text-sm font-medium">{account.account_number}</div>
+                                      <div className="text-xs text-gray-500">{account.account_type || 'Savings'}</div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="text-sm font-semibold text-green-600">
+                                        ${account.balance?.toLocaleString() || '0.00'}
+                                      </div>
+                                      <div className={`text-xs ${
+                                        account.is_active !== false ? 'text-green-500' : 'text-red-500'
+                                      }`}>
+                                        {account.is_active !== false ? 'Active' : 'Inactive'}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
                           </div>
-                          <div className="text-sm text-gray-500">
-                            {account.user?.email || 'No email available'}
+
+                          {/* Cards Section */}
+                          <div className="bg-white rounded-lg border">
+                            <div className="px-4 py-3 border-b border-gray-200">
+                              <h5 className="text-md font-medium text-gray-900 flex items-center">
+                                <span className="material-symbols-outlined mr-2 text-purple-500">credit_card</span>
+                                Cards ({userData.cards.length})
+                              </h5>
+                            </div>
+                            <div className="p-4 space-y-3 max-h-48 overflow-y-auto">
+                              {userData.cards.length === 0 ? (
+                                <p className="text-sm text-gray-500 text-center py-4">No cards</p>
+                              ) : (
+                                userData.cards.map(card => (
+                                  <div key={card.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                                    <div>
+                                      <div className="text-sm font-medium">{card.card_number || 'Card'}</div>
+                                      <div className="text-xs text-gray-500">{card.card_type || 'Credit'}</div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className={`text-xs px-2 py-1 rounded ${
+                                        card.status === 'active' ? 'bg-green-100 text-green-800' :
+                                        card.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                        'bg-red-100 text-red-800'
+                                      }`}>
+                                        {card.status || 'Pending'}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
                           </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            account.account_type === 'savings'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-blue-100 text-blue-800'
-                          }`}>
-                            {account.account_type?.charAt(0).toUpperCase() + account.account_type?.slice(1) || 'Savings'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          ${account.balance?.toLocaleString() || '0.00'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            account.is_active !== false
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}>
-                            {account.is_active !== false ? 'Active' : 'Inactive'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {account.created_at ? new Date(account.created_at).toLocaleDateString() : 'Unknown'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <button 
-                            onClick={() => handleViewAccount(account)}
-                            className="text-indigo-600 hover:text-indigo-900 mr-2"
-                          >
-                            View
-                          </button>
-                          <button 
-                            onClick={() => handleAdjustBalance(account.id, account.balance)}
-                            className="text-green-600 hover:text-green-900 mr-2"
-                          >
-                            Adjust
-                          </button>
-                          <button 
-                            onClick={() => handleToggleAccount(account.id, account.is_active !== false)}
-                            className={`${
-                            account.is_active !== false
-                              ? 'text-red-600 hover:text-red-900'
-                              : 'text-green-600 hover:text-green-900'
-                          }`}>
-                            {account.is_active !== false ? 'Deactivate' : 'Activate'}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+
+                          {/* Loans Section */}
+                          <div className="bg-white rounded-lg border">
+                            <div className="px-4 py-3 border-b border-gray-200">
+                              <h5 className="text-md font-medium text-gray-900 flex items-center">
+                                <span className="material-symbols-outlined mr-2 text-orange-500">trending_up</span>
+                                Loans ({userData.loans.length})
+                              </h5>
+                            </div>
+                            <div className="p-4 space-y-3 max-h-48 overflow-y-auto">
+                              {userData.loans.length === 0 ? (
+                                <p className="text-sm text-gray-500 text-center py-4">No loans</p>
+                              ) : (
+                                userData.loans.map(loan => (
+                                  <div key={loan.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                                    <div>
+                                      <div className="text-sm font-medium">${loan.principal?.toLocaleString() || '0'}</div>
+                                      <div className="text-xs text-gray-500">{loan.purpose || 'General'} • {loan.duration_months}m</div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className={`text-xs px-2 py-1 rounded ${
+                                        loan.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                        loan.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                        'bg-red-100 text-red-800'
+                                      }`}>
+                                        {loan.status || 'Pending'}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Recent Transactions Section */}
+                          <div className="bg-white rounded-lg border">
+                            <div className="px-4 py-3 border-b border-gray-200">
+                              <h5 className="text-md font-medium text-gray-900 flex items-center">
+                                <span className="material-symbols-outlined mr-2 text-green-500">swap_horiz</span>
+                                Recent Transactions ({userData.transactions.slice(0, 5).length})
+                              </h5>
+                            </div>
+                            <div className="p-4 space-y-3 max-h-48 overflow-y-auto">
+                              {userData.transactions.length === 0 ? (
+                                <p className="text-sm text-gray-500 text-center py-4">No transactions</p>
+                              ) : (
+                                userData.transactions.slice(0, 5).map(txn => (
+                                  <div key={txn.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                                    <div>
+                                      <div className="text-sm font-medium">${txn.amount?.toLocaleString() || '0'}</div>
+                                      <div className="text-xs text-gray-500">
+                                        {new Date(txn.timestamp).toLocaleDateString()}
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className={`text-xs px-2 py-1 rounded ${
+                                        txn.status === 'SUCCESS' ? 'bg-green-100 text-green-800' :
+                                        txn.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                                        'bg-red-100 text-red-800'
+                                      }`}>
+                                        {txn.status || 'Unknown'}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                              {/* Quick Actions */}
+                              <div className="mt-6 flex flex-wrap gap-2">
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleViewAccount(userData.accounts[0]);
+                                  }}
+                                  className="px-3 py-1 bg-blue-100 text-blue-800 rounded text-sm hover:bg-blue-200 transition-colors"
+                                  disabled={userData.accounts.length === 0}
+                                >
+                                  View Details
+                                </button>
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    userData.accounts[0] && handleAdjustBalance(userData.accounts[0].id, userData.summary.totalBalance);
+                                  }}
+                                  className="px-3 py-1 bg-green-100 text-green-800 rounded text-sm hover:bg-green-200 transition-colors"
+                                  disabled={userData.accounts.length === 0}
+                                >
+                                  Adjust Balance
+                                </button>
+                                <button 
+                                  className="px-3 py-1 bg-gray-100 text-gray-800 rounded text-sm hover:bg-gray-200 transition-colors"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    alert(`Financial Statement for ${userData.user.full_name || userData.user.username}\n\nTotal Balance: $${userData.summary.totalBalance.toLocaleString()}\nAccounts: ${userData.summary.accountsCount}\nCards: ${userData.summary.cardsCount}\nLoans: ${userData.summary.loansCount}\nTransactions: ${userData.summary.transactionsCount}`);
+                                  }}
+                                >
+                                  Generate Statement
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-              {accountsWithUsers.length === 0 && !loading && (
-                <div className="text-center py-12">
-                  <span className="material-symbols-outlined text-6xl text-gray-300 mb-4">account_balance</span>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Accounts Found</h3>
-                  <p className="text-gray-500">No bank accounts are currently registered in the system.</p>
-                </div>
-              )}
             </div>
           </div>
         )}

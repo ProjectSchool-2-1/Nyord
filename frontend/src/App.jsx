@@ -3,6 +3,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationApiContext';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
+import AdminRoute from './components/AdminRoute';
 import LandingPage from './pages/LandingPage';
 import Dashboard from './pages/Dashboard';
 import AuthContainer from './components/AuthContainer';
@@ -72,9 +73,9 @@ function App() {
               </ProtectedRoute>
             } />
             <Route path="/admin" element={
-              <ProtectedRoute>
+              <AdminRoute>
                 <AdminDashboard />
-              </ProtectedRoute>
+              </AdminRoute>
             } />
             <Route path="/notifications" element={
               <ProtectedRoute>

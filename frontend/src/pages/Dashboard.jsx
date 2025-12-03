@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { dashboardAPI } from '../services/api';
+import AdminDashboard from './AdminDashboard';
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -21,6 +24,11 @@ const Dashboard = () => {
       setLoading(false);
     }
   };
+
+  // If user is admin, show AdminDashboard instead
+  if (user?.role === 'admin') {
+    return <AdminDashboard />;
+  }
 
   useEffect(() => {
     fetchDashboardData();
