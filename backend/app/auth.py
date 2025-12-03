@@ -2,7 +2,10 @@ from fastapi import HTTPException, Depends
 from sqlalchemy.orm import Session
 from . import models, utils
 from .database import get_db
+from .email_service import email_service
+from datetime import datetime
 import random
+import asyncio
 
 
 def get_current_user(token: str = Depends(utils.get_token_from_header), db: Session = Depends(get_db)):
@@ -78,6 +81,20 @@ def register_user(user_data, db: Session):
     existing_email = db.query(models.User).filter(models.User.email == user_data.email).first()
     if existing_email:
         raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Verify email OTP if provided
+    email_verified = False
+    if hasattr(user_data, 'email_otp') and user_data.email_otp:
+        email_verified = email_service.verify_otp(
+            email=user_data.email,
+            otp=user_data.email_otp,
+            purpose="email_verification"
+        )
+        if not email_verified:
+            raise HTTPException(status_code=400, detail="Invalid or expired email OTP")
+    
+    # For now, allow registration without email verification but mark the status
+    # In production, you might want to require email verification
 
     hashed_pw = utils.hash_password(user_data.password)
 
@@ -88,6 +105,8 @@ def register_user(user_data, db: Session):
         role=user_data.role if hasattr(user_data, 'role') else "customer",
         status="pending",  # All new users need approval
         kyc_approved=False,
+        email_verified=email_verified,
+        email_verified_at=datetime.utcnow() if email_verified else None,
         full_name=user_data.full_name,
         phone=user_data.phone,
         date_of_birth=user_data.date_of_birth,

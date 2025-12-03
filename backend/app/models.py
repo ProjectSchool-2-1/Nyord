@@ -13,6 +13,10 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(String, default="customer", nullable=False)  # 'customer', 'admin'
     
+    # Email verification
+    email_verified = Column(Boolean, default=False)
+    email_verified_at = Column(DateTime, nullable=True)
+    
     # Approval and KYC fields
     status = Column(String, default="pending", nullable=False)  # 'pending', 'approved', 'rejected', 'suspended'
     kyc_approved = Column(Boolean, default=False)

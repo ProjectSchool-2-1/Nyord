@@ -15,3 +15,7 @@ alembic
 requests
 qrcode[pil]
 pillow
+aiosmtplib
+email-validator
+jinja2
+dnspython

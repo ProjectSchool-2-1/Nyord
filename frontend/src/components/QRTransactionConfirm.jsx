@@ -19,7 +19,7 @@ const QRTransactionConfirm = ({
     if (!amount || parseFloat(amount) <= 0) {
       newErrors.amount = 'Please enter a valid amount';
     } else if (parseFloat(amount) > 999999) {
-      newErrors.amount = 'Amount cannot exceed ₹999,999';
+      newErrors.amount = 'Amount cannot exceed $999,999';
     }
 
     if (description.length > 100) {
@@ -135,7 +135,7 @@ const QRTransactionConfirm = ({
             Amount *
           </label>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">₹</span>
+            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">$</span>
             <input
               type="text"
               value={amount}
@@ -221,7 +221,7 @@ const QRTransactionConfirm = ({
             ) : (
               <>
                 <span className="material-symbols-outlined mr-2 text-sm">send</span>
-                Send ₹{amount || '0.00'}
+                Send ${amount || '0.00'}
               </>
             )}
           </button>

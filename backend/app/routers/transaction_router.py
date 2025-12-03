@@ -107,7 +107,7 @@ def qr_transfer(
         raise HTTPException(status_code=400, detail="Amount must be greater than 0")
     
     if amount > 999999:
-        raise HTTPException(status_code=400, detail="Amount cannot exceed ₹999,999")
+        raise HTTPException(status_code=400, detail="Amount cannot exceed $999,999")
     
     # Prevent self-transfer
     if recipient_id == current_user.id:

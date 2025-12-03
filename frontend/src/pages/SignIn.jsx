@@ -98,7 +98,7 @@ const SignIn = () => {
               <div className="text-white/70 text-sm">Active Users</div>
             </div>
             <div>
-              <div className="text-3xl font-bold">₹2.5B+</div>
+              <div className="text-3xl font-bold">$2.5B+</div>
               <div className="text-white/70 text-sm">Transactions</div>
             </div>
             <div>

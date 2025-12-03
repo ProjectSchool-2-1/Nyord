@@ -176,7 +176,7 @@ const AccountStatements = () => {
 
   const displayTransactions = enrichedTransactions;
 
-  const formatINR = (n) => `₹ ${(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const formatINR = (n) => `$ ${(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const downloadPdf = () => {
     const doc = new jsPDF({ unit: 'pt', format: 'a4' });

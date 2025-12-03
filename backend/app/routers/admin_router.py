@@ -5,7 +5,9 @@ from typing import List
 from .. import models, schemas, auth
 from ..database import get_db
 from .notification_router import create_notification_service
+from ..email_service import email_service
 import random
+import asyncio
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -317,6 +319,27 @@ async def approve_kyc(
     
     db.commit()
     db.refresh(user)
+    
+    # Send approval/rejection email
+    try:
+        services = []
+        if approval_request.action.lower() == "approve":
+            services = ["Banking Services", "Online Account Access"]
+        
+        success, email_message = await email_service.send_approval_email(
+            email=user.email,
+            user_name=user.full_name or user.username,
+            status="approved" if approval_request.action.lower() == "approve" else "rejected",
+            services=services
+        )
+        
+        if success:
+            message += " - Email notification sent"
+        else:
+            message += f" - Email notification failed: {email_message}"
+            
+    except Exception as e:
+        message += f" - Email notification error: {str(e)}"
     
     return {
         "message": message,

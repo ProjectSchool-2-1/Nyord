@@ -336,7 +336,7 @@ const QRPayment = () => {
               <div className="p-6">
                 <div className="space-y-4">
                   <div className="text-center">
-                    <p className="text-3xl font-bold text-gray-900">₹{transaction.amount}</p>
+                    <p className="text-3xl font-bold text-gray-900">${transaction.amount}</p>
                     <p className="text-sm text-gray-600 mt-1">Sent to {recipient.full_name || recipient.username}</p>
                   </div>
 

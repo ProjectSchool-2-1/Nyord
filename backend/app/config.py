@@ -23,3 +23,11 @@ def get_cors_origins() -> list[str]:
 		return ["*"]
 	return CORS_ORIGINS
 
+# Email configuration
+SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+FROM_NAME = os.getenv("FROM_NAME", "Nyord Banking")
+FROM_EMAIL = os.getenv("FROM_EMAIL", SMTP_USER)
+
