@@ -11,10 +11,6 @@ class UserCreate(BaseModel):
     role: str = "customer"  # 'customer', 'admin'
     account_type: str = "savings"  # 'savings' or 'current'
     
-    # Email verification (optional for now)
-    email_otp: Optional[str] = None
-    email_verified: Optional[bool] = False
-    
     # Personal information (required for KYC)
     full_name: str
     phone: str
