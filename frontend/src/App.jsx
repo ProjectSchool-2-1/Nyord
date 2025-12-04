@@ -1,7 +1,9 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { NotificationProvider } from './contexts/NotificationApiContext';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
+import AdminRoute from './components/AdminRoute';
 import LandingPage from './pages/LandingPage';
 import Dashboard from './pages/Dashboard';
 import AuthContainer from './components/AuthContainer';
@@ -13,13 +15,18 @@ import FixedDeposits from './pages/FixedDeposits';
 import Profile from './pages/Profile';
 import Help from './pages/Help';
 import Transfer from './pages/Transfer';
+import AdminDashboard from './pages/AdminDashboard';
+import Notifications from './pages/Notifications';
+import QRPayment from './pages/QRPayment';
+import PaymentPage from './pages/PaymentPage';
 
 function App() {
   return (
     <Router>
       <AuthProvider>
-        <div className="min-h-screen bg-white dark:bg-gray-900">
-          <Navbar />
+        <NotificationProvider>
+          <div className="min-h-screen bg-white dark:bg-gray-900">
+            <Navbar />
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/signin" element={<AuthContainer />} />
@@ -67,8 +74,55 @@ function App() {
                 <Help />
               </ProtectedRoute>
             } />
+            <Route path="/admin" element={
+              <AdminRoute>
+                <AdminDashboard />
+              </AdminRoute>
+            } />
+            <Route path="/admin/kyc" element={
+              <AdminRoute>
+                <AdminDashboard />
+              </AdminRoute>
+            } />
+            <Route path="/admin/loans" element={
+              <AdminRoute>
+                <AdminDashboard />
+              </AdminRoute>
+            } />
+            <Route path="/admin/cards" element={
+              <AdminRoute>
+                <AdminDashboard />
+              </AdminRoute>
+            } />
+            <Route path="/admin/users" element={
+              <AdminRoute>
+                <AdminDashboard />
+              </AdminRoute>
+            } />
+            <Route path="/admin/transactions" element={
+              <AdminRoute>
+                <AdminDashboard />
+              </AdminRoute>
+            } />
+            <Route path="/admin/accounts" element={
+              <AdminRoute>
+                <AdminDashboard />
+              </AdminRoute>
+            } />
+            <Route path="/notifications" element={
+              <ProtectedRoute>
+                <Notifications />
+              </ProtectedRoute>
+            } />
+            <Route path="/qr-payment" element={
+              <ProtectedRoute>
+                <QRPayment />
+              </ProtectedRoute>
+            } />
+            <Route path="/pay" element={<PaymentPage />} />
           </Routes>
-        </div>
+          </div>
+        </NotificationProvider>
       </AuthProvider>
     </Router>
   );

@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { dashboardAPI } from '../services/api';
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -22,8 +24,29 @@ const Dashboard = () => {
     }
   };
 
+  // If user is admin, redirect to admin route
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      navigate('/admin', { replace: true });
+      return;
+    }
+  }, [user, navigate]);
+
   useEffect(() => {
     fetchDashboardData();
+
+    // Listen for balance updates from WebSocket
+    const handleBalanceUpdate = (event) => {
+      console.log('Balance update received:', event.detail);
+      // Refresh dashboard data when balance changes
+      fetchDashboardData();
+    };
+
+    window.addEventListener('balanceUpdate', handleBalanceUpdate);
+
+    return () => {
+      window.removeEventListener('balanceUpdate', handleBalanceUpdate);
+    };
   }, []);
 
   if (loading) {

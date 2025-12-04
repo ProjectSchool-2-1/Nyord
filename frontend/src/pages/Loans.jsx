@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { loansAPI, authAPI } from '../services/api';
 import { jsPDF } from 'jspdf';
 
+const BASE_URL = 'http://localhost:8000';
+
 const Loans = () => {
   const [loanAmount, setLoanAmount] = useState(250000);
   const [loanTenure, setLoanTenure] = useState(20);

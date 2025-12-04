@@ -11,5 +11,8 @@ celery_app = Celery(
 # Previously this was set to a custom queue 'transaction.process',
 # causing the worker (listening only on 'celery') to never receive tasks.
 celery_app.conf.task_routes = {
-    "process_transaction": {"queue": "celery"} ###
+    "process_transaction": {"queue": "celery"},
+    "send_email_task": {"queue": "celery"},
+    "send_otp_task": {"queue": "celery"},
+    "send_welcome_email_task": {"queue": "celery"}
 }
