@@ -18,6 +18,12 @@ CORS_ORIGINS = _split_env_list(_env_origins_raw)
 # Whether to allow all origins in development if explicitly set.
 ALLOW_ALL_ORIGINS = os.getenv("ALLOW_ALL_ORIGINS", "false").lower() == "true"
 
+# Email / SMTP settings for OTP
+SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "your-email@gmail.com")  # Set in .env
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "your-app-password")  # Set in .env
+
 def get_cors_origins() -> list[str]:
 	if ALLOW_ALL_ORIGINS:
 		return ["*"]
