@@ -39,7 +39,7 @@ class User(Base):
     emergency_contact_phone = Column(String, nullable=True)
     emergency_contact_relation = Column(String, nullable=True)
 
-    accounts = relationship("Account", back_populates="owner")
+    accounts = relationship("Account", back_populates="owner", foreign_keys="[Account.user_id]")
     fixed_deposits = relationship("FixedDeposit", back_populates="owner", foreign_keys="[FixedDeposit.user_id]")
     loans = relationship("Loan", back_populates="owner", foreign_keys="[Loan.user_id]")
     cards = relationship("Card", back_populates="owner", foreign_keys="[Card.user_id]")
@@ -53,8 +53,15 @@ class Account(Base):
     account_type = Column(String, default="savings")  # 'savings' or 'current'
     balance = Column(Float, default=0.0)
     user_id = Column(Integer, ForeignKey("users.id"))
+    
+    # Account approval fields
+    status = Column(String, default="pending", nullable=False)  # 'pending', 'approved', 'rejected'
+    approved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    approval_date = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
-    owner = relationship("User", back_populates="accounts")
+    owner = relationship("User", back_populates="accounts", foreign_keys=[user_id])
+    approver = relationship("User", foreign_keys=[approved_by])
 
 class Transaction(Base):
     __tablename__ = "transactions"

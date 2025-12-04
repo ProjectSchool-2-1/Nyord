@@ -4,7 +4,7 @@ import XapoStyleScroll from '../components/XapoStyleScroll';
 
 const LandingPage = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
+    <div className="min-h-screen -mt-16 bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
       {/* Scroll Expand Media Hero Section */}
       <ScrollExpandMedia
         title="Banking Made Simple"

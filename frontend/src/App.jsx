@@ -1,7 +1,8 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationApiContext';
-import Navbar from './components/Navbar';
+import CustomNavbar from './components/CustomNavbar';
+import InteractiveMenu from './components/InteractiveMenu';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
 import LandingPage from './pages/LandingPage';
@@ -10,6 +11,7 @@ import AuthContainer from './components/AuthContainer';
 import ForgotPassword from './pages/ForgotPassword';
 import ManageCards from './pages/ManageCards';
 import AccountStatements from './pages/AccountStatements';
+import AccountManager from './pages/AccountManager';
 import Loans from './pages/Loans';
 import FixedDeposits from './pages/FixedDeposits';
 import Profile from './pages/Profile';
@@ -25,8 +27,9 @@ function App() {
     <Router>
       <AuthProvider>
         <NotificationProvider>
-          <div className="min-h-screen bg-white dark:bg-gray-900">
-            <Navbar />
+          <div className="min-h-screen bg-white dark:bg-gray-900 pb-20 md:pb-0">
+            <CustomNavbar />
+            <main className="pt-16">
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/signin" element={<AuthContainer />} />
@@ -47,6 +50,11 @@ function App() {
             <Route path="/statements" element={
               <ProtectedRoute>
                 <AccountStatements />
+              </ProtectedRoute>
+            } />
+            <Route path="/accounts" element={
+              <ProtectedRoute>
+                <AccountManager />
               </ProtectedRoute>
             } />
             <Route path="/loans" element={
@@ -121,6 +129,8 @@ function App() {
             } />
             <Route path="/pay" element={<PaymentPage />} />
           </Routes>
+            </main>
+            <InteractiveMenu />
           </div>
         </NotificationProvider>
       </AuthProvider>

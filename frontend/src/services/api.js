@@ -109,7 +109,7 @@ export const accountsAPI = {
   },
 
   createAccount: async (accountData) => {
-    return await apiRequest('/accounts', {
+    return await apiRequest('/accounts/create', {
       method: 'POST',
       body: JSON.stringify(accountData),
     });
@@ -117,6 +117,47 @@ export const accountsAPI = {
 
   getUserAccounts: async (userId) => {
     return await apiRequest(`/accounts/user/${userId}`);
+  },
+
+  getPendingAccounts: async () => {
+    return await apiRequest('/accounts/pending-approvals');
+  },
+
+  approveAccount: async (approvalData) => {
+    return await apiRequest('/accounts/approve', {
+      method: 'POST',
+      body: JSON.stringify(approvalData),
+    });
+  },
+
+  transferBetweenAccounts: async (transferData) => {
+    return await apiRequest('/accounts/transfer-between-accounts', {
+      method: 'POST',
+      body: JSON.stringify(transferData),
+    });
+  },
+
+  getApprovedAccounts: async () => {
+    return await apiRequest('/accounts/my-approved');
+  },
+
+  getAccountBalance: async (accountId) => {
+    return await apiRequest(`/accounts/${accountId}/balance`);
+  },
+
+  transferBetweenAccounts: async (transferData) => {
+    return await apiRequest('/accounts/transfer-between-accounts', {
+      method: 'POST',
+      body: JSON.stringify(transferData),
+    });
+  },
+
+  getApprovedAccounts: async () => {
+    return await apiRequest('/accounts/my-approved');
+  },
+
+  getAccountBalance: async (accountId) => {
+    return await apiRequest(`/accounts/${accountId}/balance`);
   },
 };
 

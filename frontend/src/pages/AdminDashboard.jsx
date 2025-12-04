@@ -6,6 +6,7 @@ import { adminAPI } from '../services/api';
 import KYCApprovalDashboard from '../components/KYCApprovalDashboard';
 import LoanApprovalDashboard from '../components/LoanApprovalDashboard';
 import CardApprovalDashboard from '../components/CardApprovalDashboard';
+import AccountApprovals from '../components/AccountApprovals';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -18,20 +19,70 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
-  // Get active tab from URL
-  const getActiveTabFromPath = () => {
+  // Active tab state
+  const [activeTab, setActiveTab] = useState('overview');
+
+  // Update active tab from URL path
+  useEffect(() => {
     const path = location.pathname;
-    if (path === '/admin') return 'overview';
-    if (path.includes('/kyc')) return 'kyc';
-    if (path.includes('/loans')) return 'loans';
-    if (path.includes('/cards')) return 'cards';
-    if (path.includes('/users')) return 'users';
-    if (path.includes('/transactions')) return 'transactions';
-    if (path.includes('/accounts')) return 'accounts';
-    return 'overview';
+    if (path === '/admin/kyc') {
+      setActiveTab('kyc');
+    } else if (path === '/admin/loans') {
+      setActiveTab('loans');
+    } else if (path === '/admin/cards') {
+      setActiveTab('cards');
+    } else if (path === '/admin/accounts') {
+      setActiveTab('accounts');
+    } else if (path === '/admin/users') {
+      setActiveTab('users');
+    } else if (path === '/admin/transactions') {
+      setActiveTab('transactions');
+    } else {
+      setActiveTab('overview');
+    }
+  }, [location.pathname]);
+
+  // Refresh transactions data when transactions tab becomes active
+  useEffect(() => {
+    if (activeTab === 'transactions') {
+      refreshTransactions();
+    }
+  }, [activeTab]);
+
+  const refreshTransactions = async () => {
+    try {
+      setLoading(true);
+      const [transactionsRes, usersRes, accountsRes] = await Promise.all([
+        adminAPI.getTransactions(0, 50), // Get more transactions
+        adminAPI.getAllUsers(),
+        adminAPI.getAccounts(0, 100)
+      ]);
+      
+      setTransactions(transactionsRes);
+      
+      // Enrich transactions with user data
+      const enrichedTransactions = transactionsRes.map(transaction => {
+        const srcAccount = accountsRes.find(acc => acc.id === transaction.src_account);
+        const destAccount = accountsRes.find(acc => acc.id === transaction.dest_account);
+        const srcUser = usersRes.find(user => user.id === srcAccount?.user_id);
+        const destUser = usersRes.find(user => user.id === destAccount?.user_id);
+        
+        return {
+          ...transaction,
+          srcUser: srcUser || null,
+          destUser: destUser || null,
+          srcAccountNumber: srcAccount?.account_number || transaction.src_account,
+          destAccountNumber: destAccount?.account_number || transaction.dest_account
+        };
+      });
+      
+      setTransactionsWithUsers(enrichedTransactions);
+    } catch (err) {
+      console.error('Failed to refresh transactions:', err);
+    } finally {
+      setLoading(false);
+    }
   };
-  
-  const activeTab = getActiveTabFromPath();
   const [accountsWithUsers, setAccountsWithUsers] = useState([]);
   const [transactionsWithUsers, setTransactionsWithUsers] = useState([]);
   const [allCards, setAllCards] = useState([]);
@@ -346,6 +397,8 @@ Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString(
         </div>
       </div>
 
+
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
         {error && (
@@ -393,6 +446,9 @@ Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString(
                 </div>
               ))}
             </div>
+
+            {/* Account Approvals - Always visible on overview */}
+            <AccountApprovals />
           </div>
         )}
 
@@ -1001,6 +1057,9 @@ Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString(
         {/* Accounts Tab - Comprehensive Financial Overview */}
         {activeTab === 'accounts' && (
           <div className="space-y-6">
+            {/* Account Approvals Section */}
+            <AccountApprovals />
+            
             <div className="bg-white rounded-lg shadow overflow-hidden">
               <div className="px-4 py-5 sm:p-6">
                 <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Complete Financial Overview - All Users</h3>
@@ -1274,6 +1333,185 @@ Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString(
                       );
                     })}
                   </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Users Tab */}
+        {activeTab === 'users' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="px-4 py-5 sm:p-6">
+                <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">User Management</h3>
+                
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">KYC Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Accounts</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Balance</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {users.map((user) => {
+                        const userData = comprehensiveUserData.find(u => u.user.id === user.id);
+                        return (
+                          <tr key={user.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                                  <span className="text-white text-sm font-medium">
+                                    {user.full_name?.charAt(0) || user.username?.charAt(0) || 'U'}
+                                  </span>
+                                </div>
+                                <div className="ml-4">
+                                  <div className="text-sm font-medium text-gray-900">
+                                    {user.full_name || user.username || `User ${user.id}`}
+                                  </div>
+                                  <div className="text-sm text-gray-500">ID: {user.id}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {user.email || 'No email'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'
+                              }`}>
+                                {user.role || 'customer'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                user.kyc_approved ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                              }`}>
+                                {user.kyc_approved ? 'Approved' : 'Pending'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {userData?.summary.accountsCount || 0}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              ${userData?.summary.totalBalance?.toLocaleString() || '0.00'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'Unknown'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Transactions Tab */}
+        {activeTab === 'transactions' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="px-4 py-5 sm:p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">All Transactions</h3>
+                  <button
+                    onClick={refreshTransactions}
+                    disabled={loading}
+                    className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                  >
+                    {loading ? (
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    ) : (
+                      <svg className="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    )}
+                    {loading ? 'Refreshing...' : 'Refresh'}
+                  </button>
+                </div>
+                
+                {loading ? (
+                  <div className="flex justify-center py-8">
+                    <svg className="animate-spin h-8 w-8 text-gray-500" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  </div>
+                ) : transactionsWithUsers.length === 0 ? (
+                  <div className="text-center py-8">
+                    <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <h3 className="mt-2 text-sm font-medium text-gray-900">No transactions found</h3>
+                    <p className="mt-1 text-sm text-gray-500">There are no transactions to display at this time.</p>
+                  </div>
+                ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transaction ID</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">From</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">To</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {transactionsWithUsers.map((transaction) => (
+                        <tr key={transaction.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            TXN-{transaction.id}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <div>
+                              <div className="font-medium">{transaction.srcUser?.full_name || transaction.srcUser?.username || 'Unknown'}</div>
+                              <div className="text-gray-500">{transaction.srcAccountNumber}</div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <div>
+                              <div className="font-medium">{transaction.destUser?.full_name || transaction.destUser?.username || 'Unknown'}</div>
+                              <div className="text-gray-500">{transaction.destAccountNumber}</div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <span className="font-semibold text-green-600">
+                              ${transaction.amount?.toLocaleString() || '0.00'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              transaction.status === 'SUCCESS'
+                                ? 'bg-green-100 text-green-800'
+                                : transaction.status === 'FAILED'
+                                ? 'bg-red-100 text-red-800'
+                                : 'bg-yellow-100 text-yellow-800'
+                            }`}>
+                              {transaction.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {transaction.timestamp ? new Date(transaction.timestamp).toLocaleDateString() : 'Unknown'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
                 )}
               </div>
             </div>
