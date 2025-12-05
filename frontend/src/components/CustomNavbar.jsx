@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationApiContext';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
+import ThemeToggle from './ThemeToggle';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -288,6 +289,14 @@ const MobileNav = ({ isLandingPage, userRole }) => {
                 {link.label}
               </Link>
             ))}
+            
+            {/* Theme Toggle for Mobile */}
+            <div className="p-2 border-t border-white/20 mt-2 pt-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Theme</span>
+                <ThemeToggle />
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -400,11 +409,7 @@ const CustomNavbar = () => {
   const isActive = (path) => location.pathname === path;
 
   return (
-    <header className={`w-full fixed top-0 z-50 transition-all duration-300 ${
-      isLandingPage 
-        ? "bg-transparent border-transparent backdrop-blur-sm" 
-        : "border-b border-gray-200 bg-white/95 backdrop-blur shadow-sm"
-    }`}>
+    <header className="w-full fixed top-0 z-50 transition-all duration-300 bg-transparent border-transparent">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between gap-4">
           {/* Logo Section */}
@@ -433,6 +438,11 @@ const CustomNavbar = () => {
                 ) : (
                   <CustomerNavigationButtons isLandingPage={isLandingPage} isActive={isActive} />
                 )}
+
+                {/* Theme Toggle */}
+                <div className="flex">
+                  <ThemeToggle />
+                </div>
 
                 {/* Notifications */}
                 <div className="hidden sm:flex">

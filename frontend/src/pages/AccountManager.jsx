@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import CreateAccount from '../components/CreateAccount';
+import { accountsAPI } from '../services/api';
 
 const AccountManager = () => {
   const [accounts, setAccounts] = useState([]);
@@ -10,8 +11,7 @@ const AccountManager = () => {
   const [transferData, setTransferData] = useState({
     from_account_id: '',
     to_account_id: '',
-    amount: '',
-    description: ''
+    amount: ''
   });
   const [transferLoading, setTransferLoading] = useState(false);
   const [transferSuccess, setTransferSuccess] = useState('');
@@ -23,18 +23,7 @@ const AccountManager = () => {
   const fetchAccounts = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/accounts/me', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch accounts');
-      }
-
-      const data = await response.json();
+      const data = await accountsAPI.getAccounts();
       setAccounts(data);
       setError('');
     } catch (err) {
@@ -70,33 +59,17 @@ const AccountManager = () => {
     setTransferSuccess('');
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/accounts/transfer-between-accounts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          from_account_id: parseInt(transferData.from_account_id),
-          to_account_id: parseInt(transferData.to_account_id),
-          amount: parseFloat(transferData.amount),
-          description: transferData.description
-        })
+      await accountsAPI.transferBetweenAccounts({
+        from_account_id: parseInt(transferData.from_account_id),
+        to_account_id: parseInt(transferData.to_account_id),
+        amount: parseFloat(transferData.amount)
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || 'Transfer failed');
-      }
 
       setTransferSuccess(`Transfer of $${transferData.amount} completed successfully!`);
       setTransferData({
         from_account_id: '',
         to_account_id: '',
-        amount: '',
-        description: ''
+        amount: ''
       });
 
       // Refresh accounts to show updated balances
@@ -386,18 +359,7 @@ const AccountManager = () => {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Description (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={transferData.description}
-                    onChange={(e) => setTransferData(prev => ({ ...prev, description: e.target.value }))}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                    placeholder="Inter-account transfer"
-                  />
-                </div>
+
 
                 <div className="flex gap-3 pt-4">
                   <button

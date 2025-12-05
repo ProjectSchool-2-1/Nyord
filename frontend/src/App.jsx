@@ -21,11 +21,14 @@ import AdminDashboard from './pages/AdminDashboard';
 import Notifications from './pages/Notifications';
 import QRPayment from './pages/QRPayment';
 import PaymentPage from './pages/PaymentPage';
+import Feedback from './pages/Feedback';
+import Stocks from './pages/Stocks';
+import NotFound from './pages/NotFound';
 
 function App() {
   return (
-    <Router>
-      <AuthProvider>
+    <AuthProvider>
+      <Router>
         <NotificationProvider>
           <div className="min-h-screen bg-white dark:bg-gray-900 pb-20 md:pb-0">
             <CustomNavbar />
@@ -75,6 +78,11 @@ function App() {
             <Route path="/transfer" element={
               <ProtectedRoute>
                 <Transfer />
+              </ProtectedRoute>
+            } />
+            <Route path="/feedback" element={
+              <ProtectedRoute>
+                <Feedback />
               </ProtectedRoute>
             } />
             <Route path="/help" element={
@@ -127,14 +135,21 @@ function App() {
                 <QRPayment />
               </ProtectedRoute>
             } />
+            <Route path="/stocks" element={
+              <ProtectedRoute>
+                <Stocks />
+              </ProtectedRoute>
+            } />
             <Route path="/pay" element={<PaymentPage />} />
+            {/* Catch-all route for 404 */}
+            <Route path="*" element={<NotFound />} />
           </Routes>
             </main>
             <InteractiveMenu />
           </div>
         </NotificationProvider>
-      </AuthProvider>
-    </Router>
+      </Router>
+    </AuthProvider>
   );
 }
 

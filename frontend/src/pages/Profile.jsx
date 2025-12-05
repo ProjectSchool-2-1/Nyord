@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { profileAPI } from '../services/api';
 import QRCodeDisplay from '../components/QRCodeDisplay';
+import ToastSave from '../components/ToastSave';
 
 const Profile = () => {
   const { user: authUser, updateUser } = useAuth();
@@ -9,6 +10,7 @@ const Profile = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [isEditing, setIsEditing] = useState(false);
+  const [saveState, setSaveState] = useState('initial');
   
   const [formData, setFormData] = useState({
     // Basic Info
@@ -89,17 +91,31 @@ const Profile = () => {
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setSaveState('loading');
     
     try {
       const updatedUser = await profileAPI.updateProfile(formData);
       updateUser(updatedUser);
       showMessage('success', 'Profile updated successfully!');
+      setSaveState('success');
       setIsEditing(false);
+      
+      // Reset state after 2 seconds
+      setTimeout(() => {
+        setSaveState('initial');
+      }, 2000);
     } catch (error) {
       showMessage('error', error.response?.data?.detail || error.message || 'Failed to update profile');
+      setSaveState('initial');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleReset = () => {
+    loadProfile(); // Reset to original data
+    setSaveState('initial');
+    setIsEditing(false);
   };
 
   const handlePasswordChange = async (e) => {

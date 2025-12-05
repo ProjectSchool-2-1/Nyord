@@ -18,7 +18,8 @@ import {
   Rocket,
   Newspaper,
   StickyNote,
-  Star
+  Star,
+  TrendingUp
 } from 'lucide-react';
 
 export const InteractiveMenu = ({ items, accentColor }) => {
@@ -30,7 +31,7 @@ export const InteractiveMenu = ({ items, accentColor }) => {
   const mobileNavItems = [
     { label: 'Dashboard', icon: Home, path: user?.role === 'admin' ? '/admin' : '/dashboard' },
     { label: 'Transactions', icon: ArrowLeftRight, path: user?.role === 'admin' ? '/admin/transactions' : '/statements' },
-    { label: 'QR Payment', icon: CreditCard, path: '/qr-payment' },
+    { label: 'Stocks', icon: TrendingUp, path: '/stocks' },
     { label: 'Settings', icon: Settings, path: '/profile' }
   ];
 

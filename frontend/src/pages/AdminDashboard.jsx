@@ -42,10 +42,12 @@ const AdminDashboard = () => {
     }
   }, [location.pathname]);
 
-  // Refresh transactions data when transactions tab becomes active
+  // Refresh data when specific tabs become active
   useEffect(() => {
     if (activeTab === 'transactions') {
       refreshTransactions();
+    } else if (activeTab === 'users' || activeTab === 'accounts') {
+      loadAdminData();
     }
   }, [activeTab]);
 
@@ -291,15 +293,15 @@ const AdminDashboard = () => {
     const amount = prompt(`Current balance: $${currentBalance}\nEnter adjustment amount (use + for credit, - for debit):`);
     if (!amount) return;
     
-    const reason = prompt('Enter reason for adjustment:');
+    const reason = prompt('Enter reason for balance adjustment:', 'Administrative adjustment');
     if (!reason) return;
     
     try {
       await adminAPI.adjustBalance(accountId, parseFloat(amount), reason);
-      alert('Balance adjusted successfully!');
+      showSuccess('Balance adjusted successfully!');
       loadAdminData(); // Refresh data
     } catch (error) {
-      alert('Failed to adjust balance: ' + error.message);
+      showError('Failed to adjust balance: ' + error.message);
     }
   };
 
@@ -307,13 +309,15 @@ const AdminDashboard = () => {
     const action = currentStatus ? 'deactivate' : 'activate';
     if (!confirm(`Are you sure you want to ${action} this account?`)) return;
     
+    const reason = prompt(`Enter reason to ${action} this account:`, `Account ${action}d by admin`);
+    if (!reason) return;
+    
     try {
-      // For now, just show a message since the backend endpoint might not exist
-      alert(`Account ${action} functionality would be implemented here`);
-      // await adminAPI.toggleAccountStatus(accountId, !currentStatus);
-      // loadAdminData(); // Refresh data
+      await adminAPI.toggleAccount(accountId, !currentStatus, reason);
+      showSuccess(`Account ${action}d successfully!`);
+      loadAdminData(); // Refresh data
     } catch (error) {
-      alert(`Failed to ${action} account: ` + error.message);
+      showError(`Failed to ${action} account: ` + error.message);
     }
   };
 
@@ -362,6 +366,87 @@ Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString(
       );
     } catch (err) {
       showError('Setup Failed', err.message || 'Failed to setup admin');
+    }
+  };
+
+  const handleEditUser = (user) => {
+    const updatedRole = user.role === 'admin' ? 'customer' : 'admin';
+    const updatedKyc = !user.kyc_approved;
+    
+    if (window.confirm(`Update user ${user.username || user.full_name}?\n\nChange role to: ${updatedRole}\nChange KYC status to: ${updatedKyc ? 'Approved' : 'Pending'}`)) {
+      adminAPI.updateUser(user.id, {
+        role: updatedRole,
+        kyc_approved: updatedKyc
+      }).then(() => {
+        showSuccess('User Updated', 'User has been updated successfully');
+        fetchUsers();
+        fetchComprehensiveUserData();
+      }).catch(err => {
+        showError('Update Failed', err.message || 'Failed to update user');
+      });
+    }
+  };
+
+  const handleDeleteUser = (userId, userName) => {
+    if (window.confirm(`Are you sure you want to delete user "${userName}"?\n\nThis action cannot be undone and will delete all associated accounts, loans, and cards.`)) {
+      adminAPI.deleteUser(userId).then(() => {
+        showSuccess('User Deleted', 'User has been deleted successfully');
+        fetchUsers();
+        fetchComprehensiveUserData();
+      }).catch(err => {
+        showError('Delete Failed', err.message || 'Failed to delete user');
+      });
+    }
+  };
+
+  const handleDeleteAccount = (accountId, accountNumber) => {
+    if (window.confirm(`Are you sure you want to delete account "${accountNumber}"?\n\nThis action cannot be undone.`)) {
+      adminAPI.deleteAccount(accountId).then(() => {
+        showSuccess('Account Deleted', 'Account has been deleted successfully');
+        fetchComprehensiveUserData();
+      }).catch(err => {
+        showError('Delete Failed', err.message || 'Failed to delete account');
+      });
+    }
+  };
+
+  const handleApproveCard = (cardId) => {
+    adminAPI.approveCard(cardId).then(() => {
+      showSuccess('Card Approved', 'Card has been approved successfully');
+      fetchComprehensiveUserData();
+    }).catch(err => {
+      showError('Approval Failed', err.message || 'Failed to approve card');
+    });
+  };
+
+  const handleDeleteCard = (cardId) => {
+    if (window.confirm('Are you sure you want to delete this card?\n\nThis action cannot be undone.')) {
+      adminAPI.deleteCard(cardId).then(() => {
+        showSuccess('Card Deleted', 'Card has been deleted successfully');
+        fetchComprehensiveUserData();
+      }).catch(err => {
+        showError('Delete Failed', err.message || 'Failed to delete card');
+      });
+    }
+  };
+
+  const handleApproveLoan = (loanId) => {
+    adminAPI.approveLoan(loanId).then(() => {
+      showSuccess('Loan Approved', 'Loan has been approved successfully');
+      fetchComprehensiveUserData();
+    }).catch(err => {
+      showError('Approval Failed', err.message || 'Failed to approve loan');
+    });
+  };
+
+  const handleDeleteLoan = (loanId) => {
+    if (window.confirm('Are you sure you want to delete this loan?\n\nThis action cannot be undone.')) {
+      adminAPI.deleteLoan(loanId).then(() => {
+        showSuccess('Loan Deleted', 'Loan has been deleted successfully');
+        fetchComprehensiveUserData();
+      }).catch(err => {
+        showError('Delete Failed', err.message || 'Failed to delete loan');
+      });
     }
   };
 
@@ -1177,14 +1262,36 @@ Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString(
                                       <div className="text-sm font-medium">{account.account_number}</div>
                                       <div className="text-xs text-gray-500">{account.account_type || 'Savings'}</div>
                                     </div>
-                                    <div className="text-right">
-                                      <div className="text-sm font-semibold text-green-600">
-                                        ${account.balance?.toLocaleString() || '0.00'}
+                                    <div className="flex items-center space-x-3">
+                                      <div className="text-right">
+                                        <div className="text-sm font-semibold text-green-600">
+                                          ${account.balance?.toLocaleString() || '0.00'}
+                                        </div>
+                                        <div className={`text-xs ${
+                                          account.is_active !== false ? 'text-green-500' : 'text-red-500'
+                                        }`}>
+                                          {account.is_active !== false ? 'Active' : 'Inactive'}
+                                        </div>
                                       </div>
-                                      <div className={`text-xs ${
-                                        account.is_active !== false ? 'text-green-500' : 'text-red-500'
-                                      }`}>
-                                        {account.is_active !== false ? 'Active' : 'Inactive'}
+                                      <div className="flex flex-col space-y-1">
+                                        <button
+                                          onClick={() => handleAdjustBalance(account.id, account.balance)}
+                                          className="text-xs text-blue-600 hover:text-blue-800"
+                                        >
+                                          Adjust
+                                        </button>
+                                        <button
+                                          onClick={() => handleToggleAccount(account.id, account.is_active !== false)}
+                                          className="text-xs text-orange-600 hover:text-orange-800"
+                                        >
+                                          {account.is_active !== false ? 'Disable' : 'Enable'}
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteAccount(account.id, account.account_number)}
+                                          className="text-xs text-red-600 hover:text-red-800"
+                                        >
+                                          Delete
+                                        </button>
                                       </div>
                                     </div>
                                   </div>
@@ -1211,13 +1318,27 @@ Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString(
                                       <div className="text-sm font-medium">{card.card_number || 'Card'}</div>
                                       <div className="text-xs text-gray-500">{card.card_type || 'Credit'}</div>
                                     </div>
-                                    <div className="text-right">
+                                    <div className="flex items-center space-x-3">
                                       <div className={`text-xs px-2 py-1 rounded ${
                                         card.status === 'active' ? 'bg-green-100 text-green-800' :
                                         card.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                                         'bg-red-100 text-red-800'
                                       }`}>
                                         {card.status || 'Pending'}
+                                      </div>
+                                      <div className="flex space-x-2">
+                                        <button
+                                          onClick={() => handleApproveCard(card.id)}
+                                          className="text-xs text-green-600 hover:text-green-800"
+                                        >
+                                          Approve
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteCard(card.id)}
+                                          className="text-xs text-red-600 hover:text-red-800"
+                                        >
+                                          Delete
+                                        </button>
                                       </div>
                                     </div>
                                   </div>
@@ -1244,13 +1365,27 @@ Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString(
                                       <div className="text-sm font-medium">${loan.principal?.toLocaleString() || '0'}</div>
                                       <div className="text-xs text-gray-500">{loan.purpose || 'General'} • {loan.duration_months}m</div>
                                     </div>
-                                    <div className="text-right">
+                                    <div className="flex items-center space-x-3">
                                       <div className={`text-xs px-2 py-1 rounded ${
                                         loan.status === 'approved' ? 'bg-green-100 text-green-800' :
                                         loan.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                                         'bg-red-100 text-red-800'
                                       }`}>
                                         {loan.status || 'Pending'}
+                                      </div>
+                                      <div className="flex space-x-2">
+                                        <button
+                                          onClick={() => handleApproveLoan(loan.id)}
+                                          className="text-xs text-green-600 hover:text-green-800"
+                                        >
+                                          Approve
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteLoan(loan.id)}
+                                          className="text-xs text-red-600 hover:text-red-800"
+                                        >
+                                          Delete
+                                        </button>
                                       </div>
                                     </div>
                                   </div>
@@ -1357,6 +1492,7 @@ Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString(
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Accounts</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Balance</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -1404,6 +1540,22 @@ Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString(
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'Unknown'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={() => handleEditUser(user)}
+                                  className="text-blue-600 hover:text-blue-900 font-medium"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteUser(user.id, user.username || user.full_name)}
+                                  className="text-red-600 hover:text-red-900 font-medium"
+                                >
+                                  Delete
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );

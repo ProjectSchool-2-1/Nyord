@@ -275,6 +275,13 @@ const Dashboard = () => {
                   <span className="material-symbols-outlined text-blue-600 dark:text-blue-400">send</span>
                   <span className="font-medium text-gray-900 dark:text-white">Transfer Money</span>
                 </button>
+
+                <button 
+                  onClick={() => navigate('/feedback')}
+                  className="w-full flex items-center space-x-3 p-3 rounded-lg bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors">
+                  <span className="material-symbols-outlined text-green-600 dark:text-green-400">sentiment_satisfied</span>
+                  <span className="font-medium text-gray-900 dark:text-white">Feedback</span>
+                </button>
              
                 {/* <button className="w-full flex items-center space-x-3 p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors">
                   {/* <span className="material-symbols-outlined text-purple-600 dark:text-purple-400">credit_card</span> */}

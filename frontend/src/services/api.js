@@ -145,20 +145,6 @@ export const accountsAPI = {
     return await apiRequest(`/accounts/${accountId}/balance`);
   },
 
-  transferBetweenAccounts: async (transferData) => {
-    return await apiRequest('/accounts/transfer-between-accounts', {
-      method: 'POST',
-      body: JSON.stringify(transferData),
-    });
-  },
-
-  getApprovedAccounts: async () => {
-    return await apiRequest('/accounts/my-approved');
-  },
-
-  getAccountBalance: async (accountId) => {
-    return await apiRequest(`/accounts/${accountId}/balance`);
-  },
 };
 
 // Profile API
@@ -204,6 +190,21 @@ export const transactionsAPI = {
 
   searchUsers: async (query) => {
     return await apiRequest(`/users/search?q=${encodeURIComponent(query)}`);
+  },
+
+  // QR Payment methods
+  decodeQR: async (qrData) => {
+    return await apiRequest('/qr/decode', {
+      method: 'POST',
+      body: JSON.stringify({ qr_data: qrData }),
+    });
+  },
+
+  processQRPayment: async (paymentData) => {
+    return await apiRequest('/qr/pay', {
+      method: 'POST',
+      body: JSON.stringify(paymentData),
+    });
   },
 };
 
@@ -334,10 +335,45 @@ export const adminAPI = {
   deleteUser: async (userId) => {
     return await apiRequest(`/admin/users/${userId}`, { method: 'DELETE' });
   },
-  adjustBalance: async (accountId, amount, reason) => {
-    return await apiRequest(`/admin/accounts/${accountId}/adjust-balance`, {
+  adjustBalance: async (accountId, amount, reason = 'Balance adjustment by admin') => {
+    return await apiRequest(`/admin/accounts/${accountId}/adjust-balance?amount=${parseFloat(amount)}&reason=${encodeURIComponent(reason)}`, {
       method: 'POST',
-      body: JSON.stringify({ amount, reason }),
+    });
+  },
+
+  toggleAccount: async (accountId, isActive, reason = 'Account status changed by admin') => {
+    return await apiRequest(`/admin/accounts/${accountId}/toggle?active=${isActive}&reason=${encodeURIComponent(reason)}`, {
+      method: 'POST',
+    });
+  },
+
+  deleteAccount: async (accountId) => {
+    return await apiRequest(`/admin/accounts/${accountId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  approveCard: async (cardId) => {
+    return await apiRequest(`/admin/cards/${cardId}/approve`, {
+      method: 'POST',
+    });
+  },
+
+  deleteCard: async (cardId) => {
+    return await apiRequest(`/admin/cards/${cardId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  approveLoan: async (loanId) => {
+    return await apiRequest(`/admin/loans/${loanId}/approve`, {
+      method: 'POST',
+    });
+  },
+
+  deleteLoan: async (loanId) => {
+    return await apiRequest(`/admin/loans/${loanId}`, {
+      method: 'DELETE',
     });
   },
   

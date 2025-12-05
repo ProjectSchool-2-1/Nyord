@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import QRScanner from '../components/QRScanner';
 import QRUploader from '../components/QRUploader';
 import QRTransactionConfirm from '../components/QRTransactionConfirm';
-import { apiRequest } from '../services/api';
+import { transactionsAPI } from '../services/api';
 
 const QRPayment = () => {
   const [activeTab, setActiveTab] = useState('scan'); // 'scan', 'upload'
@@ -22,13 +22,7 @@ const QRPayment = () => {
 
     try {
       // Decode the QR code data through backend
-      // Send the QR data as JSON with proper structure
-      const response = await apiRequest('/qr/decode', {
-        method: 'POST',
-        body: JSON.stringify({
-          qr_data: qrData
-        })
-      });
+      const response = await transactionsAPI.decodeQR(qrData);
 
       if (response.valid && response.can_transact) {
         setRecipient(response.recipient);
@@ -67,10 +61,7 @@ const QRPayment = () => {
     setError('');
 
     try {
-      const response = await apiRequest('/transactions/qr-transfer', {
-        method: 'POST',
-        body: JSON.stringify(transactionData),
-      });
+      const response = await transactionsAPI.processQRPayment(transactionData);
 
       setTransaction(response);
       setStep('success');
