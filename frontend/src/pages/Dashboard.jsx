@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { dashboardAPI } from '../services/api';
+import NotificationPermissionBanner from '../components/NotificationPermissionBanner';
 import { 
   CreditCard, 
   TrendingUp, 
@@ -91,10 +92,12 @@ const Dashboard = () => {
   }, [showDropdown]);
 
   // Real data from API with fallbacks
-  const totalIncome = dashboardData?.monthly_income || 5200.00;
-  const totalExpenses = dashboardData?.monthly_expenses || 3750.90;
-  const cardBalance = dashboardData?.total_balance || 8450.75;
-  const currentNetWorth = dashboardData?.total_balance - dashboardData?.loans_summary?.total_outstanding || 2350.90;
+  const totalIncome = dashboardData?.monthly_income || 0.00;
+  const totalExpenses = dashboardData?.monthly_expenses || 0.00;
+  const cardBalance = dashboardData?.total_balance || 0.00;
+  const currentNetWorth = (dashboardData?.total_balance || 0) - (dashboardData?.loans?.total_outstanding || 0);
+  const incomeChange = dashboardData?.income_change_percent || 0;
+  const expenseChange = dashboardData?.expense_change_percent || 0;
 
   // Transform recent transactions from API
   const recentTransactions = dashboardData?.recent_transactions?.map(txn => ({
@@ -107,10 +110,13 @@ const Dashboard = () => {
       minute: '2-digit',
       hour12: true
     }),
-    description: txn.type === 'credit' ? 'Received' : 'Sent',
-    account: `Account ${txn.type === 'credit' ? txn.src_account : txn.dest_account}`,
+    description: txn.description || (txn.type === 'credit' ? 'Received' : 'Sent'),
+    account: txn.type === 'credit' ? 
+      `From: ${txn.src_account_number || 'Unknown'}` : 
+      `To: ${txn.dest_account_number || 'Unknown'}`,
     amount: txn.type === 'credit' ? txn.amount : -txn.amount,
-    type: txn.type
+    type: txn.type,
+    userName: txn.type === 'credit' ? txn.src_user_name : txn.dest_user_name
   })) || [
     // Fallback mock data if no API data
     {
@@ -168,6 +174,9 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Notification Permission Banner */}
+      <NotificationPermissionBanner />
+      
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -235,7 +244,10 @@ const Dashboard = () => {
                   <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">
                     ${cardBalance.toLocaleString()}
                   </p>
-                  <p className="text-sm text-teal-600 font-medium">+5.25% from last month</p>
+                  <p className="text-sm text-teal-600 font-medium">
+                    {dashboardData?.balance_change_percent > 0 ? '+' : ''}
+                    {dashboardData?.balance_change_percent?.toFixed(2) || '0.00'}% from last month
+                  </p>
                 </div>
               </div>
               
@@ -243,15 +255,19 @@ const Dashboard = () => {
               <div className="relative">
                 <div className="w-72 h-44 bg-gradient-to-br from-teal-600 to-teal-700 rounded-2xl p-6 text-white shadow-xl">
                   <div className="flex items-center justify-between mb-8">
-                    <span className="font-semibold text-lg">Bankio</span>
+                    <span className="font-semibold text-lg">Nyord</span>
                     <div className="w-8 h-8 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
                       <div className="w-4 h-4 bg-white bg-opacity-30 rounded-full"></div>
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <p className="text-lg font-mono tracking-wider">2984 5676 9834 3723</p>
+                    <p className="text-lg font-mono tracking-wider">
+                      {dashboardData?.accounts?.[0]?.account_number || "•••• •••• •••• ••••"}
+                    </p>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm opacity-90">Aubrey Sabrina</span>
+                      <span className="text-sm opacity-90">
+                        {user?.full_name || user?.username || "Card Holder"}
+                      </span>
                       <div className="flex space-x-2">
                         <div className="w-8 h-5 bg-red-500 rounded-full opacity-80"></div>
                         <div className="w-8 h-5 bg-yellow-500 rounded-full opacity-80 -ml-3"></div>
@@ -267,7 +283,9 @@ const Dashboard = () => {
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Current Net Worth</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">${currentNetWorth.toLocaleString()}</p>
-                <p className="text-xs text-gray-400">Investment Performance Last Year: ${8750.00.toLocaleString()}</p>
+                <p className="text-xs text-gray-400">
+                  FD Investments: ${(dashboardData?.fixed_deposits?.total_investment || 0).toLocaleString()}
+                </p>
               </div>
               
               {/* Performance Circle */}
@@ -288,12 +306,14 @@ const Dashboard = () => {
                     fill="none"
                     stroke="#14b8a6"
                     strokeWidth="6"
-                    strokeDasharray={`${2 * Math.PI * 40 * 0.68} ${2 * Math.PI * 40}`}
+                    strokeDasharray={`${2 * Math.PI * 40 * (Math.abs(dashboardData?.balance_change_percent || 0) / 100)} ${2 * Math.PI * 40}`}
                     strokeLinecap="round"
                   />
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-lg font-semibold text-teal-600">68%</span>
+                  <span className="text-lg font-semibold text-teal-600">
+                    {Math.abs(dashboardData?.balance_change_percent || 0).toFixed(0)}%
+                  </span>
                 </div>
               </div>
             </div>
@@ -368,7 +388,9 @@ const Dashboard = () => {
                   <TrendingUp size={24} />
                 </div>
               </div>
-              <p className="text-sm text-teal-600 mt-2">+10% Last Month</p>
+              <p className={`text-sm mt-2 ${incomeChange >= 0 ? 'text-teal-600' : 'text-red-500'}`}>
+                {incomeChange >= 0 ? '+' : ''}{incomeChange.toFixed(1)}% Last Month
+              </p>
             </div>
 
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
@@ -377,11 +399,13 @@ const Dashboard = () => {
                   <p className="text-sm text-gray-500 dark:text-gray-400">Total Expenses</p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">${totalExpenses.toLocaleString()}</p>
                 </div>
-                <div className="text-red-500">
+                <div className={totalExpenses > 0 ? "text-red-500" : "text-gray-400"}>
                   <TrendingDown size={24} />
                 </div>
               </div>
-              <p className="text-sm text-red-500 mt-2">+5% Last Month</p>
+              <p className={`text-sm mt-2 ${expenseChange <= 0 ? 'text-teal-600' : 'text-red-500'}`}>
+                {expenseChange >= 0 ? '+' : ''}{expenseChange.toFixed(1)}% Last Month
+              </p>
             </div>
           </div>
 

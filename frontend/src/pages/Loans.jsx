@@ -48,7 +48,8 @@ const Loans = () => {
     fetchUser();
 
     // WebSocket live updates
-    const ws = new WebSocket(`${BASE_URL.replace('http', 'ws')}/ws`);
+    const token = localStorage.getItem('token');
+    const ws = new WebSocket(`${BASE_URL.replace('http', 'ws')}/ws?token=${token}`);
     ws.onmessage = (msg) => {
       try {
         const event = JSON.parse(msg.data);

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
+import notificationService from '../services/notificationService';
 
 const BASE_URL = 'http://localhost:8000';
 
@@ -111,12 +112,16 @@ export function NotificationProvider({ children }) {
           setNotifications(prev => [data.data, ...prev]);
           setUnreadCount(prev => prev + 1);
           
-          // Show browser notification if permission granted
-          if (Notification.permission === 'granted') {
-            new Notification(data.data.title, {
-              body: data.data.message,
-              icon: '/favicon.ico'
-            });
+          // Show browser notification using notification service
+          const notificationData = data.data;
+          if (notificationData.category === 'transaction') {
+            notificationService.showTransactionNotification(notificationData);
+          } else if (notificationData.category === 'loan') {
+            notificationService.showLoanNotification(notificationData.message, notificationData.type === 'loan_approved');
+          } else if (notificationData.category === 'kyc') {
+            notificationService.showKYCNotification(notificationData.message, notificationData.type === 'kyc_approved');
+          } else {
+            notificationService.showAccountNotification(notificationData.message, notificationData.type || 'info');
           }
         } else if (data.type === 'transaction.success') {
           console.log('Transaction completed:', data);

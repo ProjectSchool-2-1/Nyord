@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Bell, Check, CheckCheck, Trash2, Filter, Search, Clock, User, CreditCard, DollarSign, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '../contexts/ThemeContext';
 import { getToken } from '../services/api';
 
 const BASE_URL = 'http://localhost:8000';
 
 const Notifications = () => {
   const { user } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const token = getToken();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);

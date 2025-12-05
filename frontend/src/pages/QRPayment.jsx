@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '../contexts/ThemeContext';
 import QRScanner from '../components/QRScanner';
 import QRUploader from '../components/QRUploader';
 import QRTransactionConfirm from '../components/QRTransactionConfirm';
 import { transactionsAPI } from '../services/api';
 
 const QRPayment = () => {
+  const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('scan'); // 'scan', 'upload'
   const [step, setStep] = useState('input'); // 'input', 'confirm', 'success'
   const [scannedData, setScannedData] = useState(null);
