@@ -25,10 +25,10 @@ from . import config
 load_dotenv()
 FINNHUB_KEY = os.getenv("FINNHUB_KEY")
 
-# In-memory latest prices
+# In-memory latest prices with mock data for testing
 latest_prices = {
-    "AAPL": None,
-    "NVDA": None
+    "AAPL": 195.89,
+    "NVDA": 140.25
 }
 
 
