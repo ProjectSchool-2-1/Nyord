@@ -2,13 +2,41 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { dashboardAPI } from '../services/api';
+import { 
+  CreditCard, 
+  TrendingUp, 
+  TrendingDown, 
+  ArrowUpRight, 
+  ArrowDownRight,
+  Search,
+  MoreHorizontal,
+  Calendar,
+  Send,
+  Download,
+  Wallet,
+  Building,
+  Settings,
+  LogOut,
+  ChevronDown
+} from 'lucide-react';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/signin');
+  };
+
+  const handleSettings = () => {
+    navigate('/profile');
+    setShowDropdown(false);
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -38,7 +66,6 @@ const Dashboard = () => {
     // Listen for balance updates from WebSocket
     const handleBalanceUpdate = (event) => {
       console.log('Balance update received:', event.detail);
-      // Refresh dashboard data when balance changes
       fetchDashboardData();
     };
 
@@ -49,245 +76,375 @@ const Dashboard = () => {
     };
   }, []);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showDropdown && !event.target.closest('.relative')) {
+        setShowDropdown(false);
+      }
+    };
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <span className="material-symbols-outlined text-6xl text-red-500 mb-4">error</span>
-          <p className="text-red-600 dark:text-red-400">{error}</p>
-          <button 
-            onClick={fetchDashboardData}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showDropdown]);
 
-  const {
-    total_balance = 0,
-    balance_change_percent = 0,
-    monthly_income = 0,
-    income_change_percent = 0,
-    monthly_expenses = 0,
-    expense_change_percent = 0,
-    accounts = [],
-    recent_transactions = [],
-  } = dashboardData || {};
+  // Real data from API with fallbacks
+  const totalIncome = dashboardData?.monthly_income || 5200.00;
+  const totalExpenses = dashboardData?.monthly_expenses || 3750.90;
+  const cardBalance = dashboardData?.total_balance || 8450.75;
+  const currentNetWorth = dashboardData?.total_balance - dashboardData?.loans_summary?.total_outstanding || 2350.90;
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-    }).format(amount);
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', {
+  // Transform recent transactions from API
+  const recentTransactions = dashboardData?.recent_transactions?.map(txn => ({
+    id: txn.id,
+    date: new Date(txn.timestamp).toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
-    });
-  };
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    }),
+    description: txn.type === 'credit' ? 'Received' : 'Sent',
+    account: `Account ${txn.type === 'credit' ? txn.src_account : txn.dest_account}`,
+    amount: txn.type === 'credit' ? txn.amount : -txn.amount,
+    type: txn.type
+  })) || [
+    // Fallback mock data if no API data
+    {
+      id: 1,
+      date: 'Feb 3, 2025, 06:30 AM',
+      description: 'Salary',
+      account: 'Bank 94711',
+      amount: 3000.00,
+      type: 'credit'
+    },
+    {
+      id: 2,
+      date: 'Feb 4, 2025, 08:45 PM',
+      description: 'Netflix',
+      account: 'Netflix Billing',
+      amount: -15.99,
+      type: 'debit'
+    },
+    {
+      id: 3,
+      date: 'Feb 3, 2025, 11:30 AM',
+      description: 'John Doe',
+      account: 'Bank 94710',
+      amount: 4500.00,
+      type: 'credit'
+    },
+    {
+      id: 4,
+      date: 'Feb 1, 2025, 07:45 AM',
+      description: 'Maria Garcia',
+      account: 'Bank 94712',
+      amount: 3700.00,
+      type: 'credit'
+    }
+  ];
+
+  const quickTransferContacts = [
+    { name: 'Alex', avatar: '👤', color: 'bg-red-500' },
+    { name: 'Sarah', avatar: '👤', color: 'bg-green-500' },
+    { name: 'Mike', avatar: '👤', color: 'bg-blue-500' },
+    { name: 'Emma', avatar: '👤', color: 'bg-yellow-500' },
+    { name: 'John', avatar: '👤', color: 'bg-purple-500' },
+    { name: 'Lisa', avatar: '👤', color: 'bg-pink-500' }
+  ];
+
+  const spendingData = [40, 60, 45, 80, 100, 65, 75]; // Weekly spending data
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Dashboard</h1>
-          <p className="text-gray-600 dark:text-gray-400">Welcome back! Here's your financial overview</p>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            Welcome, {user?.username?.split(' ')[0] || 'User'}!
+          </h1>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">
+            Effortlessly manage your finances with real-time insights
+          </p>
         </div>
-
-        {/* Stats Grid */}
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white">
-            <div className="flex items-center justify-between mb-4">
-              <span className="material-symbols-outlined text-4xl opacity-80">account_balance_wallet</span>
-              <span className={`text-sm px-3 py-1 rounded-full ${
-                balance_change_percent >= 0 
-                  ? 'bg-white/20' 
-                  : 'bg-red-500/30'
-              }`}>
-                {balance_change_percent >= 0 ? '+' : ''}{balance_change_percent.toFixed(1)}%
-              </span>
-            </div>
-            <div className="text-sm opacity-90 mb-1">Total Balance</div>
-            <div className="text-3xl font-bold">{formatCurrency(total_balance)}</div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
-            <div className="flex items-center justify-between mb-4">
-              <span className="material-symbols-outlined text-4xl text-green-500">trending_up</span>
-              <span className={`text-sm px-3 py-1 rounded-full ${
-                income_change_percent >= 0
-                  ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30'
-                  : 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30'
-              }`}>
-                {income_change_percent >= 0 ? '+' : ''}{income_change_percent.toFixed(1)}%
-              </span>
-            </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Monthly Income</div>
-            <div className="text-3xl font-bold text-gray-900 dark:text-white">{formatCurrency(monthly_income)}</div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
-            <div className="flex items-center justify-between mb-4">
-              <span className="material-symbols-outlined text-4xl text-red-500">trending_down</span>
-              <span className={`text-sm px-3 py-1 rounded-full ${
-                expense_change_percent <= 0
-                  ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30'
-                  : 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30'
-              }`}>
-                {expense_change_percent.toFixed(1)}%
-              </span>
-            </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Monthly Expenses</div>
-            <div className="text-3xl font-bold text-gray-900 dark:text-white">{formatCurrency(monthly_expenses)}</div>
+        <div className="flex items-center gap-4">
+          {/* <button className="p-2 bg-white dark:bg-gray-800 rounded-full shadow-sm hover:shadow-md transition-shadow">
+            <Search size={20} className="text-gray-500 dark:text-gray-400" />
+          </button>
+          <button className="p-2 bg-white dark:bg-gray-800 rounded-full shadow-sm hover:shadow-md transition-shadow">
+            <Download size={20} className="text-gray-500 dark:text-gray-400" />
+          </button>
+          <button className="p-2 bg-white dark:bg-gray-800 rounded-full shadow-sm hover:shadow-md transition-shadow">
+            <Calendar size={20} className="text-gray-500 dark:text-gray-400" />
+          </button> */}
+          <div className="relative">
+            <button 
+              onClick={() => setShowDropdown(!showDropdown)}
+              className="w-10 h-10 bg-gradient-to-r from-teal-500 to-teal-600 rounded-full flex items-center justify-center text-white font-semibold text-sm hover:from-teal-600 hover:to-teal-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
+            >
+              {user?.username?.charAt(0)?.toUpperCase() || 'U'}
+            </button>
+            
+            {showDropdown && (
+              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-10">
+                <button
+                  onClick={handleSettings}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
+                >
+                  <Settings size={16} />
+                  Settings
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 transition-colors"
+                >
+                  <LogOut size={16} />
+                  Sign Out
+                </button>
+              </div>
+            )}
           </div>
         </div>
+      </div>
 
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Accounts */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">My Accounts</h2>
-                <button className="text-blue-600 dark:text-blue-400 text-sm font-medium hover:underline">View All</button>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column - Main Content */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Card Overview */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">Card Overview</h2>
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Effortlessly track your card balance and recent transactions
+                </p>
+                <div className="mt-4">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Main Balance</p>
+                  <p className="text-xs text-gray-400">Dec 2024</p>
+                  <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">
+                    ${cardBalance.toLocaleString()}
+                  </p>
+                  <p className="text-sm text-teal-600 font-medium">+5.25% from last month</p>
+                </div>
               </div>
               
-              {accounts.length === 0 ? (
-                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  <span className="material-symbols-outlined text-5xl mb-2 opacity-50">account_balance</span>
-                  <p>No accounts found</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {accounts.map((account) => (
-                    <div key={account.id} className="flex items-center justify-between p-4 rounded-xl bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer">
-                      <div className="flex items-center space-x-4">
-                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                          account.account_type === 'savings' ? 'bg-blue-100 dark:bg-blue-900/30' :
-                          account.account_type === 'current' ? 'bg-green-100 dark:bg-green-900/30' :
-                          'bg-purple-100 dark:bg-purple-900/30'
-                        }`}>
-                          <span className={`material-symbols-outlined ${
-                            account.account_type === 'savings' ? 'text-blue-600 dark:text-blue-400' :
-                            account.account_type === 'current' ? 'text-green-600 dark:text-green-400' :
-                            'text-purple-600 dark:text-purple-400'
-                          }`}>
-                            account_balance
-                          </span>
-                        </div>
-                        <div>
-                          <div className="font-semibold text-gray-900 dark:text-white">
-                            {account.account_type === 'savings' ? 'Savings Account' : 
-                             account.account_type === 'current' ? 'Current Account' : 'Account'}
-                          </div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">{account.account_number}</div>
-                        </div>
-                      </div>
-                      <div className={`text-xl font-bold ${account.balance >= 0 ? 'text-gray-900 dark:text-white' : 'text-red-600 dark:text-red-400'}`}>
-                        {formatCurrency(Math.abs(account.balance))}
+              {/* Credit Card */}
+              <div className="relative">
+                <div className="w-72 h-44 bg-gradient-to-br from-teal-600 to-teal-700 rounded-2xl p-6 text-white shadow-xl">
+                  <div className="flex items-center justify-between mb-8">
+                    <span className="font-semibold text-lg">Bankio</span>
+                    <div className="w-8 h-8 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                      <div className="w-4 h-4 bg-white bg-opacity-30 rounded-full"></div>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-lg font-mono tracking-wider">2984 5676 9834 3723</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm opacity-90">Aubrey Sabrina</span>
+                      <div className="flex space-x-2">
+                        <div className="w-8 h-5 bg-red-500 rounded-full opacity-80"></div>
+                        <div className="w-8 h-5 bg-yellow-500 rounded-full opacity-80 -ml-3"></div>
                       </div>
                     </div>
-                  ))}
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
 
-            {/* Recent Transactions */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Recent Transactions</h2>
-                <button className="text-blue-600 dark:text-blue-400 text-sm font-medium hover:underline">View All</button>
+            {/* Investment Performance */}
+            <div className="mt-8 flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Current Net Worth</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">${currentNetWorth.toLocaleString()}</p>
+                <p className="text-xs text-gray-400">Investment Performance Last Year: ${8750.00.toLocaleString()}</p>
               </div>
-
-              {recent_transactions.length === 0 ? (
-                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  <span className="material-symbols-outlined text-5xl mb-2 opacity-50">receipt_long</span>
-                  <p>No recent transactions</p>
+              
+              {/* Performance Circle */}
+              <div className="relative w-24 h-24">
+                <svg className="w-24 h-24 transform -rotate-90" viewBox="0 0 100 100">
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    fill="none"
+                    stroke="#e5e7eb"
+                    strokeWidth="6"
+                  />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    fill="none"
+                    stroke="#14b8a6"
+                    strokeWidth="6"
+                    strokeDasharray={`${2 * Math.PI * 40 * 0.68} ${2 * Math.PI * 40}`}
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-lg font-semibold text-teal-600">68%</span>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {recent_transactions.map((txn) => (
-                    <div key={txn.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                          txn.type === 'credit' 
-                            ? 'bg-green-100 dark:bg-green-900/30' 
-                            : 'bg-red-100 dark:bg-red-900/30'
-                        }`}>
-                          <span className={`material-symbols-outlined text-sm ${
-                            txn.type === 'credit' 
-                              ? 'text-green-600 dark:text-green-400' 
-                              : 'text-red-600 dark:text-red-400'
-                          }`}>
-                            {txn.type === 'credit' ? 'arrow_downward' : 'arrow_upward'}
-                          </span>
-                        </div>
-                        <div>
-                          <div className="font-medium text-gray-900 dark:text-white">
-                            {txn.type === 'credit' ? 'Received' : 'Sent'}
-                          </div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {formatDate(txn.timestamp)} • {txn.status}
-                          </div>
-                        </div>
-                      </div>
-                      <div className={`font-bold ${
-                        txn.type === 'credit' 
-                          ? 'text-green-600 dark:text-green-400' 
-                          : 'text-red-600 dark:text-red-400'
-                      }`}>
-                        {txn.type === 'credit' ? '+' : '-'}{formatCurrency(txn.amount)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              </div>
             </div>
           </div>
 
-          {/* Quick Actions Sidebar */}
-          <div className="space-y-6">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Quick Actions</h2>
-              <div className="space-y-3">
-                <button 
-                  onClick={() => navigate('/transfer')}
-                  className="w-full flex items-center space-x-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors">
-                  <span className="material-symbols-outlined text-blue-600 dark:text-blue-400">send</span>
-                  <span className="font-medium text-gray-900 dark:text-white">Transfer Money</span>
-                </button>
+          {/* Recent Transfer Activity */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Recent Transfer Activity</h2>
+              <select className="text-sm border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-800">
+                <option>February</option>
+                <option>January</option>
+                <option>December</option>
+              </select>
+            </div>
 
-                <button 
-                  onClick={() => navigate('/feedback')}
-                  className="w-full flex items-center space-x-3 p-3 rounded-lg bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors">
-                  <span className="material-symbols-outlined text-green-600 dark:text-green-400">sentiment_satisfied</span>
-                  <span className="font-medium text-gray-900 dark:text-white">Feedback</span>
-                </button>
-             
-                {/* <button className="w-full flex items-center space-x-3 p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors">
-                  {/* <span className="material-symbols-outlined text-purple-600 dark:text-purple-400">credit_card</span> */}
-                  {/* <span className="font-medium text-gray-900 dark:text-white">Pay Bills</span> */}
-                {/* </button> */} 
+            <div className="space-y-4">
+              <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 border-b pb-2">
+                <span className="w-32">Date & Time</span>
+                <span className="flex-1">Description</span>
+                <span className="w-24">Account</span>
+                <span className="w-24 text-right">Amount</span>
               </div>
+              
+              {recentTransactions.map((transaction) => (
+                <div key={transaction.id} className="flex items-center gap-4 py-3 border-b border-gray-100 dark:border-gray-700 last:border-0">
+                  <span className="w-32 text-xs text-gray-500">{transaction.date}</span>
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      transaction.type === 'credit' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+                    }`}>
+                      {transaction.type === 'credit' ? <ArrowDownRight size={16} /> : <ArrowUpRight size={16} />}
+                    </div>
+                    <span className="font-medium text-gray-900 dark:text-white">{transaction.description}</span>
+                  </div>
+                  <span className="w-24 text-sm text-gray-500">{transaction.account}</span>
+                  <span className={`w-24 text-right font-semibold ${
+                    transaction.type === 'credit' ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {transaction.type === 'credit' ? '+' : ''}${Math.abs(transaction.amount).toLocaleString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
+              <button className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700">
+                <Download size={16} />
+                Recent Transfer
+              </button>
+              <button 
+                onClick={() => navigate('/account-statements')}
+                className="text-sm text-teal-600 hover:text-teal-700 font-medium"
+              >
+                View Full Transaction History →
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column - Sidebar */}
+        <div className="space-y-6">
+          {/* Total Income/Expenses */}
+          <div className="space-y-4">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Total Income</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">${totalIncome.toLocaleString()}</p>
+                </div>
+                <div className="text-teal-600">
+                  <TrendingUp size={24} />
+                </div>
+              </div>
+              <p className="text-sm text-teal-600 mt-2">+10% Last Month</p>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Total Expenses</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">${totalExpenses.toLocaleString()}</p>
+                </div>
+                <div className="text-red-500">
+                  <TrendingDown size={24} />
+                </div>
+              </div>
+              <p className="text-sm text-red-500 mt-2">+5% Last Month</p>
+            </div>
+          </div>
+
+          {/* Quick Transfer */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-gray-900 dark:text-white">Quick Transfer</h3>
+              <Search size={16} className="text-gray-400" />
+            </div>
+
+            <div className="flex items-center gap-4 mb-4">
+              <button className="p-3 bg-gray-100 dark:bg-gray-700 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                <Building size={20} className="text-gray-600 dark:text-gray-400" />
+              </button>
+              <button className="p-3 bg-gray-100 dark:bg-gray-700 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                <Wallet size={20} className="text-gray-600 dark:text-gray-400" />
+              </button>
+              <button className="p-3 bg-gray-100 dark:bg-gray-700 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                <Send size={20} className="text-gray-600 dark:text-gray-400" />
+              </button>
+              <button className="p-3 bg-gray-100 dark:bg-gray-700 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                <MoreHorizontal size={20} className="text-gray-600 dark:text-gray-400" />
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-500 mb-3">Recent User Transfer</p>
+            <div className="flex justify-between items-center mb-4">
+              {quickTransferContacts.map((contact, index) => (
+                <button
+                  key={index}
+                  className={`w-10 h-10 rounded-full ${contact.color} flex items-center justify-center text-white text-sm font-medium hover:scale-110 transition-transform`}
+                >
+                  {contact.name.charAt(0)}
+                </button>
+              ))}
+            </div>
+
+            <button 
+              onClick={() => navigate('/transfer')}
+              className="w-full bg-gray-900 dark:bg-gray-700 text-white py-3 rounded-xl font-medium hover:bg-gray-800 dark:hover:bg-gray-600 transition-colors">
+              Quick Transfer Now
+            </button>
+          </div>
+
+          {/* Spending Overview */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-gray-900 dark:text-white">Spending Overview</h3>
+              <select className="text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-1 bg-white dark:bg-gray-800">
+                <option>Jan 12</option>
+              </select>
+            </div>
+
+            {/* Chart representation */}
+            <div className="flex items-end justify-between h-32 mb-4">
+              {spendingData.map((value, index) => (
+                <div key={index} className="flex flex-col items-center gap-2">
+                  <div
+                    className={`w-6 rounded-t ${index === 4 ? 'bg-teal-600' : 'bg-gray-300 dark:bg-gray-600'}`}
+                    style={{ height: `${(value / 100) * 80}px` }}
+                  />
+                </div>
+              ))}
             </div>
           </div>
         </div>

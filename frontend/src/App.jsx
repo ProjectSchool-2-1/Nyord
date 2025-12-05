@@ -1,7 +1,9 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationApiContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import CustomNavbar from './components/CustomNavbar';
+import SidebarNavigation from './components/SidebarNavigation';
 import InteractiveMenu from './components/InteractiveMenu';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
@@ -25,16 +27,48 @@ import Feedback from './pages/Feedback';
 import Stocks from './pages/Stocks';
 import NotFound from './pages/NotFound';
 
+// Layout wrapper component to handle conditional sidebar
+function LayoutWrapper({ children }) {
+  const { user } = useAuth();
+  const location = useLocation();
+  
+  // Pages that should not have sidebar navigation
+  const noSidebarPages = ['/', '/signin', '/signup', '/forgot-password', '/pay'];
+  const shouldShowSidebar = user && !noSidebarPages.includes(location.pathname);
+
+  if (shouldShowSidebar) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white flex">
+        <SidebarNavigation />
+        <main className="flex-1 min-h-screen overflow-auto bg-gray-50 dark:bg-gray-900">
+          <div className="p-6">
+            {children}
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
+      <CustomNavbar />
+      <main>
+        {children}
+      </main>
+      <InteractiveMenu />
+    </div>
+  );
+}
+
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <NotificationProvider>
-          <div className="min-h-screen bg-white dark:bg-gray-900 pb-20 md:pb-0">
-            <CustomNavbar />
-            <main className="pt-16">
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
+    <ThemeProvider>
+      <AuthProvider>
+        <Router>
+          <NotificationProvider>
+            <LayoutWrapper>
+            <Routes>
+              <Route path="/" element={<LandingPage />} />
             <Route path="/signin" element={<AuthContainer />} />
             <Route path="/signup" element={<AuthContainer />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -140,16 +174,15 @@ function App() {
                 <Stocks />
               </ProtectedRoute>
             } />
-            <Route path="/pay" element={<PaymentPage />} />
-            {/* Catch-all route for 404 */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-            </main>
-            <InteractiveMenu />
-          </div>
+              <Route path="/pay" element={<PaymentPage />} />
+              {/* Catch-all route for 404 */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </LayoutWrapper>
         </NotificationProvider>
       </Router>
     </AuthProvider>
+  </ThemeProvider>
   );
 }
 

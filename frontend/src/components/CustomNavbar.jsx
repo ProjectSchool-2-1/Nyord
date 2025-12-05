@@ -324,46 +324,29 @@ const UserProfileDropdown = ({ isLandingPage }) => {
         <button className="rounded-full focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 h-8 w-8">
           <Avatar className="h-8 w-8">
             <AvatarImage src="/avatar-1.png" alt="User avatar" />
-            <AvatarFallback className={isLandingPage ? "bg-white/20 text-white" : ""}>
+            <AvatarFallback className={isLandingPage ? "bg-white/20 text-white" : "bg-teal-600 text-white"}>
               {userInitials}
             </AvatarFallback>
           </Avatar>
         </button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel className="font-normal">
-          <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{user.full_name || user.username}</p>
-            <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
-          </div>
-        </DropdownMenuLabel>
-        
-        <DropdownMenuSeparator />
-        
+      <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg">
         <DropdownMenuGroup>
           <DropdownMenuItem asChild>
-            <Link to="/profile" className="cursor-pointer">
+            <Link to="/profile" className="cursor-pointer flex items-center px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md">
               <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
-              Profile
-            </Link>
-          </DropdownMenuItem>
-          
-          <DropdownMenuItem asChild>
-            <Link to="/cards" className="cursor-pointer">
-              <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-              </svg>
-              Cards
+              Settings
             </Link>
           </DropdownMenuItem>
         </DropdownMenuGroup>
         
-        <DropdownMenuSeparator />
+        <DropdownMenuSeparator className="bg-gray-200 dark:bg-gray-700" />
         
-        <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600">
+        <DropdownMenuItem onClick={handleLogout} className="cursor-pointer flex items-center px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md">
           <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
@@ -404,8 +387,9 @@ const CustomNavbar = () => {
   const location = useLocation();
   const { user } = useAuth();
   
-  // Check if current page is landing page for transparent navbar
-  const isLandingPage = location.pathname === '/';
+  // Check if current page should have transparent navbar
+  const transparentPages = ['/', '/signin', '/signup', '/forgot-password'];
+  const isLandingPage = transparentPages.includes(location.pathname);
   const isActive = (path) => location.pathname === path;
 
   return (
@@ -415,11 +399,11 @@ const CustomNavbar = () => {
           {/* Logo Section */}
           <div className="flex items-center gap-4">
             <Link to="/" className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-purple-600">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-teal-600 to-teal-700">
                 <span className="text-lg font-bold text-white">N</span>
               </div>
               <span className={`hidden text-xl font-bold sm:inline-block transition-colors ${
-                isLandingPage ? "text-white" : "text-gray-900"
+                isLandingPage ? "text-white" : "text-gray-900 dark:text-white"
               }`}>
                 Nyord
               </span>
@@ -432,28 +416,6 @@ const CustomNavbar = () => {
           <div className="flex items-center gap-4">
             {user ? (
               <>
-                {/* Custom Navigation Buttons */}
-                {user.role === 'admin' ? (
-                  <AdminNavigationButtons isLandingPage={isLandingPage} isActive={isActive} />
-                ) : (
-                  <CustomerNavigationButtons isLandingPage={isLandingPage} isActive={isActive} />
-                )}
-
-                {/* Theme Toggle */}
-                <div className="flex">
-                  <ThemeToggle />
-                </div>
-
-                {/* Notifications */}
-                <div className="hidden sm:flex">
-                  <NotificationComponent isLandingPage={isLandingPage} />
-                </div>
-
-                {/* Separator */}
-                <div className={`hidden h-5 w-px sm:block ${
-                  isLandingPage ? "bg-white/20" : "bg-gray-300"
-                }`} />
-
                 {/* User Profile */}
                 <UserProfileDropdown isLandingPage={isLandingPage} />
               </>
@@ -462,17 +424,13 @@ const CustomNavbar = () => {
               <div className="flex items-center gap-2">
                 <Link
                   to="/signin"
-                  className={`inline-flex items-center justify-center gap-2 text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 rounded-md px-4 ${
-                    isLandingPage 
-                      ? "bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm border border-white/20"
-                      : "bg-white hover:bg-gray-50 border border-gray-200 text-gray-900"
-                  }`}
+                  className="inline-flex items-center justify-center gap-2 text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 rounded-md px-4 bg-gradient-to-r from-teal-600 to-teal-700 text-white hover:from-teal-700 hover:to-teal-800"
                 >
                   Sign In
                 </Link>
                 <Link
                   to="/signup"
-                  className="inline-flex items-center justify-center gap-2 text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 rounded-md px-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700"
+                  className="inline-flex items-center justify-center gap-2 text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 rounded-md px-4 bg-gradient-to-r from-teal-600 to-teal-700 text-white hover:from-teal-700 hover:to-teal-800"
                 >
                   Sign Up
                 </Link>
