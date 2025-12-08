@@ -280,7 +280,7 @@ const Transfer = () => {
                   />
                   To Other Users
                 </label>
-                <label className="flex items-center">
+                {/* <label className="flex items-center">
                   <input
                     type="radio"
                     value="internal"
@@ -295,7 +295,7 @@ const Transfer = () => {
                     className="mr-2"
                   />
                   Between My Accounts
-                </label>
+                </label> */}
               </div>
             </div>
 
@@ -315,7 +315,7 @@ const Transfer = () => {
                   />
                   Bank Account
                 </label>
-                <label className="flex items-center">
+                {/* <label className="flex items-center">
                   <input
                     type="radio"
                     value="card"
@@ -324,7 +324,7 @@ const Transfer = () => {
                     className="mr-2"
                   />
                   Credit Card
-                </label>
+                </label> */}
               </div>
             </div>
 

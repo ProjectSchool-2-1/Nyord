@@ -201,7 +201,7 @@ export const transactionsAPI = {
   },
 
   processQRPayment: async (paymentData) => {
-    return await apiRequest('/qr/pay', {
+    return await apiRequest('/transactions/qr-transfer', {
       method: 'POST',
       body: JSON.stringify(paymentData),
     });

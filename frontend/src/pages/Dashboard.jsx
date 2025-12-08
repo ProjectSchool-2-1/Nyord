@@ -192,7 +192,7 @@ const Dashboard = () => {
         <div className="lg:col-span-2 space-y-6">
           {/* Card Overview */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">Card Overview</h2>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">Account Overview</h2>
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">

@@ -4,6 +4,65 @@ import base64
 from typing import Union
 import hashlib
 import json
+from PIL import Image, ImageDraw
+import os
+
+def add_logo_to_qr(qr_image: Image.Image) -> Image.Image:
+    """
+    Add logo to the center of QR code with proper sizing and padding.
+    
+    Args:
+        qr_image: The QR code PIL Image
+    
+    Returns:
+        QR code with logo embedded
+    """
+    # Get logo path (adjust based on your project structure)
+    logo_path = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "public", "logo.png")
+    
+    # Check if logo exists
+    if not os.path.exists(logo_path):
+        return qr_image  # Return original QR if logo not found
+    
+    try:
+        # Open logo
+        logo = Image.open(logo_path)
+        
+        # Calculate logo size (15% of QR code size for better scanning)
+        qr_width, qr_height = qr_image.size
+        logo_max_size = int(qr_width * 0.15)  # 15% of QR size (reduced from 20%)
+        
+        # Resize logo maintaining aspect ratio
+        logo.thumbnail((logo_max_size, logo_max_size), Image.Resampling.LANCZOS)
+        
+        # Create a white background with padding (adds white border around logo)
+        logo_width, logo_height = logo.size
+        padding = int(logo_max_size * 0.20)  # 20% padding (increased from 15%)
+        
+        background_size = logo_width + (padding * 2)
+        background = Image.new('RGB', (background_size, background_size), 'white')
+        
+        # Paste logo onto white background
+        logo_pos = (padding, padding)
+        if logo.mode == 'RGBA':
+            background.paste(logo, logo_pos, logo)
+        else:
+            background.paste(logo, logo_pos)
+        
+        # Calculate position to center the logo (avoiding the 3 corner squares)
+        logo_position = (
+            (qr_width - background_size) // 2,
+            (qr_height - background_size) // 2
+        )
+        
+        # Paste logo with background onto QR code
+        qr_image.paste(background, logo_position)
+        
+        return qr_image
+        
+    except Exception as e:
+        print(f"Error adding logo to QR: {e}")
+        return qr_image  # Return original QR if error occurs
 
 def generate_user_qr_code(user_id: int, user_data: dict = None, base_url: str = "http://localhost:3000") -> str:
     """
@@ -34,10 +93,10 @@ def generate_user_qr_code(user_id: int, user_data: dict = None, base_url: str = 
     # QR content is now a simple URL
     qr_content = payment_url
     
-    # Create QR code with specific settings for consistency
+    # Create QR code with HIGH error correction for logo embedding
     qr = qrcode.QRCode(
         version=1,  # Controls size, 1 is smallest
-        error_correction=qrcode.constants.ERROR_CORRECT_M,  # Medium error correction
+        error_correction=qrcode.constants.ERROR_CORRECT_H,  # HIGH error correction (30% damage tolerance)
         box_size=10,  # Size of each box in pixels
         border=4,  # Border size in boxes
     )
@@ -49,7 +108,10 @@ def generate_user_qr_code(user_id: int, user_data: dict = None, base_url: str = 
     qr_image = qr.make_image(
         fill_color="black",
         back_color="white"
-    )
+    ).convert('RGB')
+    
+    # Add logo to center of QR code
+    qr_image = add_logo_to_qr(qr_image)
     
     # Convert to base64 string
     img_buffer = io.BytesIO()
@@ -126,10 +188,10 @@ def generate_account_qr_code(account_id: int, account_data: dict = None, base_ur
     # QR content is the payment URL
     qr_content = payment_url
     
-    # Create QR code with specific settings for consistency
+    # Create QR code with HIGH error correction for logo embedding
     qr = qrcode.QRCode(
         version=1,  # Controls size
-        error_correction=qrcode.constants.ERROR_CORRECT_M,  # Medium error correction
+        error_correction=qrcode.constants.ERROR_CORRECT_H,  # HIGH error correction (30% damage tolerance)
         box_size=10,  # Size of each box in pixels
         border=4,  # Border size in boxes
     )
@@ -141,7 +203,10 @@ def generate_account_qr_code(account_id: int, account_data: dict = None, base_ur
     qr_image = qr.make_image(
         fill_color="black",
         back_color="white"
-    )
+    ).convert('RGB')
+    
+    # Add logo to center of QR code
+    qr_image = add_logo_to_qr(qr_image)
     
     # Convert to base64 string
     img_buffer = io.BytesIO()
