@@ -10,10 +10,21 @@ from .routers import loans_router
 from .routers import cards_router
 from .routers import dashboard_router
 from .routers import users_router
+from .routers import admin_router
+from .routers import notification_router
+from .routers import qr_router
+from .routers import account_qr_router
+from .routers import push_router
+from .routers import stats_router
 import threading
 import asyncio
+import json
+import os
+from dotenv import load_dotenv
 from .rabbitmq_ws_listener import rabbitmq_ws_listener
 from . import config
+
+load_dotenv()
 
 
 
@@ -43,11 +54,23 @@ app.include_router(loans_router.router)
 app.include_router(cards_router.router)
 app.include_router(dashboard_router.router)
 app.include_router(users_router.router)
+app.include_router(admin_router.router)
+app.include_router(notification_router.router)
+app.include_router(qr_router.router)
+app.include_router(push_router.router)
+app.include_router(stats_router.router)
+
+
+# Stocks streamer and /stocks endpoint removed (feature deprecated)
+
 
 @app.on_event("startup")
-def start_ws_listener():
+async def start_background_tasks():
+    # Start WebSocket listener
     thread = threading.Thread(
         target=lambda: asyncio.run(rabbitmq_ws_listener()),
         daemon=True
     )
     thread.start()
+    
+    # stock streamer removed

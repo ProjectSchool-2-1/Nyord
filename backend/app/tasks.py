@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker
 
 # App imports
 from .celery_app import celery_app
-from .models import Transaction, Account, AuditLog
+from .models import Transaction, Account, AuditLog, User, Notification
 from app.websocket_manager import manager
 
 import pika
@@ -91,7 +91,94 @@ def process_transaction(event_payload: dict):
             message=f"Txn {txn_id}: {amount} transferred from {src_id} to {dest_id}"
         ))
 
+        # Create notifications for both sender and receiver
+        # Get user information
+        src_user = db.query(User).filter(User.id == src_acc.user_id).first()
+        dest_user = db.query(User).filter(User.id == dest_acc.user_id).first()
+
+        sender_notification = None
+        receiver_notification = None
+
+        if src_user:
+            # Notification for sender
+            sender_notification = Notification(
+                user_id=src_user.id,
+                title="Transaction Sent",
+                message=f"You successfully sent ${amount:,.2f} to {dest_user.username if dest_user else 'Account ' + str(dest_id)}. Your new balance is ${src_acc.balance:,.2f}.",
+                type="transaction",
+                related_id=txn_id
+            )
+            db.add(sender_notification)
+            print(f"Created sender notification for user {src_user.id}")
+
+        if dest_user and (not src_user or dest_user.id != src_user.id):
+            # Notification for receiver (only if different from sender)
+            receiver_notification = Notification(
+                user_id=dest_user.id,
+                title="Transaction Received",
+                message=f"You received ${amount:,.2f} from {src_user.username if src_user else 'Account ' + str(src_id)}. Your new balance is ${dest_acc.balance:,.2f}.",
+                type="transaction",
+                related_id=txn_id,
+                from_user_id=src_user.id if src_user else None
+            )
+            db.add(receiver_notification)
+            print(f"Created receiver notification for user {dest_user.id}")
+
         db.commit()
+        print(f"Notifications committed to database for transaction {txn_id}")
+        
+        # Send real-time notifications via WebSocket
+        if sender_notification and src_user:
+            try:
+                print(f"Sending WebSocket notification to sender user {src_user.id}")
+                asyncio.run(manager.send_personal_message(
+                    message={
+                        "type": "notification",
+                        "data": {
+                            "id": sender_notification.id,
+                            "user_id": sender_notification.user_id,
+                            "title": sender_notification.title,
+                            "message": sender_notification.message,
+                            "type": sender_notification.type,
+                            "related_id": sender_notification.related_id,
+                            "is_read": False,
+                            "created_at": sender_notification.created_at.isoformat(),
+                            "read_at": None,
+                            "from_user_id": None,
+                            "from_user_name": None
+                        }
+                    },
+                    user_id=src_user.id
+                ))
+                print(f"WebSocket notification sent to sender user {src_user.id}")
+            except Exception as e:
+                print(f"Failed to send real-time notification to sender: {e}")
+
+        if receiver_notification and dest_user and (not src_user or dest_user.id != src_user.id):
+            try:
+                print(f"Sending WebSocket notification to receiver user {dest_user.id}")
+                asyncio.run(manager.send_personal_message(
+                    message={
+                        "type": "notification",
+                        "data": {
+                            "id": receiver_notification.id,
+                            "user_id": receiver_notification.user_id,
+                            "title": receiver_notification.title,
+                            "message": receiver_notification.message,
+                            "type": receiver_notification.type,
+                            "related_id": receiver_notification.related_id,
+                            "is_read": False,
+                            "created_at": receiver_notification.created_at.isoformat(),
+                            "read_at": None,
+                            "from_user_id": receiver_notification.from_user_id,
+                            "from_user_name": src_user.username if src_user else None
+                        }
+                    },
+                    user_id=dest_user.id
+                ))
+                print(f"WebSocket notification sent to receiver user {dest_user.id}")
+            except Exception as e:
+                print(f"Failed to send real-time notification to receiver: {e}")
         
         print(f"Processed transaction {txn_id}: SUCCESS")
         # --- Publish SUCCESS event to RabbitMQ ---
@@ -137,3 +224,146 @@ def publish_ws_event(event: dict):
     )
 
     connection.close()
+
+@celery_app.task(name="auto_debit_loan_emi")
+def auto_debit_loan_emi():
+    """Scheduled task to auto-debit EMI from linked accounts on due dates"""
+    from .models import Loan
+    from datetime import date
+    
+    db = SessionLocal()
+    try:
+        # Get all active loans where next_due_date is today or past
+        today = date.today()
+        due_loans = db.query(Loan).filter(
+            Loan.status == "ACTIVE",
+            Loan.next_due_date <= today
+        ).all()
+        
+        for loan in due_loans:
+            try:
+                # Get the linked account
+                account = db.query(Account).filter(
+                    Account.id == loan.account_ref
+                ).with_for_update().first()
+                
+                if not account:
+                    print(f"Account {loan.account_ref} not found for loan {loan.id}")
+                    # Create notification for user about failed auto-debit
+                    notification = Notification(
+                        user_id=loan.user_id,
+                        title="Loan EMI Auto-Debit Failed",
+                        message=f"Unable to debit EMI of ${loan.emi:,.2f} for your {loan.loan_type} loan. Linked account not found.",
+                        type="loan_payment",
+                        related_id=loan.id
+                    )
+                    db.add(notification)
+                    continue
+                
+                # Check if account has sufficient balance
+                if account.balance < loan.emi:
+                    print(f"Insufficient balance in account {account.id} for loan {loan.id}. Required: {loan.emi}, Available: {account.balance}")
+                    # Create notification for user
+                    notification = Notification(
+                        user_id=loan.user_id,
+                        title="Loan EMI Auto-Debit Failed",
+                        message=f"Insufficient balance to debit EMI of ${loan.emi:,.2f} for your {loan.loan_type} loan. Available balance: ${account.balance:,.2f}. Please maintain sufficient balance.",
+                        type="loan_payment",
+                        related_id=loan.id
+                    )
+                    db.add(notification)
+                    db.commit()
+                    
+                    # Send WebSocket notification
+                    try:
+                        asyncio.run(manager.send_personal_message(
+                            message={
+                                "type": "notification",
+                                "data": {
+                                    "id": notification.id,
+                                    "title": notification.title,
+                                    "message": notification.message,
+                                    "type": "loan_payment",
+                                    "is_read": False
+                                }
+                            },
+                            user_id=loan.user_id
+                        ))
+                    except Exception as e:
+                        print(f"Failed to send WebSocket notification: {e}")
+                    continue
+                
+                # Debit EMI from account
+                account.balance -= loan.emi
+                loan.amount_paid = round(loan.amount_paid + loan.emi, 2)
+                loan.outstanding = round(max(loan.total_payable - loan.amount_paid, 0.0), 2)
+                
+                # Update next due date or close loan
+                from datetime import timedelta
+                if loan.outstanding > 0:
+                    loan.next_due_date = loan.next_due_date + timedelta(days=30)
+                else:
+                    loan.status = "CLOSED"
+                    loan.next_due_date = None
+                
+                # Log the auto-debit
+                audit_log = AuditLog(
+                    event_type="LOAN_EMI_AUTO_DEBIT",
+                    message=f"Auto-debited EMI of ${loan.emi} from account {account.account_number} for loan {loan.id}"
+                )
+                db.add(audit_log)
+                
+                # Create success notification
+                notification = Notification(
+                    user_id=loan.user_id,
+                    title="Loan EMI Auto-Debited",
+                    message=f"EMI of ${loan.emi:,.2f} has been debited for your {loan.loan_type} loan. Outstanding: ${loan.outstanding:,.2f}. New balance: ${account.balance:,.2f}.",
+                    type="loan_payment",
+                    related_id=loan.id
+                )
+                db.add(notification)
+                db.commit()
+                
+                print(f"Successfully auto-debited EMI for loan {loan.id}. Outstanding: {loan.outstanding}")
+                
+                # Send WebSocket notification
+                try:
+                    asyncio.run(manager.send_personal_message(
+                        message={
+                            "type": "notification",
+                            "data": {
+                                "id": notification.id,
+                                "title": notification.title,
+                                "message": notification.message,
+                                "type": "loan_payment",
+                                "is_read": False
+                            }
+                        },
+                        user_id=loan.user_id
+                    ))
+                except Exception as e:
+                    print(f"Failed to send WebSocket notification: {e}")
+                
+                # Publish WebSocket event
+                publish_ws_event({
+                    "type": "loan.emi_debit",
+                    "loan_id": loan.id,
+                    "user_id": loan.user_id,
+                    "emi_amount": loan.emi,
+                    "outstanding": loan.outstanding,
+                    "status": loan.status,
+                    "account_balance": account.balance
+                })
+                
+            except Exception as e:
+                print(f"Error processing loan {loan.id}: {e}")
+                db.rollback()
+                continue
+        
+        print(f"Processed {len(due_loans)} due loans for EMI auto-debit")
+        
+    except Exception as e:
+        print(f"Error in auto_debit_loan_emi task: {e}")
+        db.rollback()
+    finally:
+        db.close()

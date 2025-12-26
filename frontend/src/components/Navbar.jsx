@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNotifications } from '../contexts/NotificationApiContext';
+import { NotificationBell, NotificationDropdown } from './NotificationComponents';
 import { cn } from '@/lib/utils';
 import { buttonVariants, Button } from '@/components/ui/button';
 import {
@@ -190,25 +192,85 @@ function UserProfileDropdown({ align = "end", sizeClass = "h-8 w-8" }) {
 }
 
 // Main Navbar Component
-const navigationLinks = [
+const getNavigationLinks = (user) => [
   {
     name: "Menu",
     items: [
-      { href: "/dashboard", label: "Dashboard" },
-      { href: "/cards", label: "Cards" },
-      { href: "/statements", label: "Statements" },
-      { href: "/loans", label: "Loans" },
-      { href: "/fixed-deposits", label: "Fixed Deposits" },
-      { href: "https://www.tradingview.com/", label: "Stocks", external: true },
+      ...(user?.role === 'admin'
+        ? [
+            { href: "/admin", label: "Overview" },
+            { href: "/admin/kyc", label: "KYC Approval" },
+            { href: "/admin/loans", label: "Loan Approvals" },
+            { href: "/admin/cards", label: "Card Approvals" },
+            { href: "/admin/users", label: "Users" }
+          ]
+        : [
+            { href: "/dashboard", label: "Dashboard" },
+            { href: "/accounts", label: "Accounts" },
+            { href: "/statements", label: "Statements" },
+            { href: "/loans", label: "Loans" }
+          ]
+      ),
+      { href: "/notifications", label: "Notifications" },
       { href: "/profile", label: "Settings" },
     ],
   },
 ];
 
+// Notification Component
+function NotificationComponent() {
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const handleNotificationClick = (notification) => {
+    if (notification.type === 'view_all') {
+      navigate('/notifications');
+    } else {
+      // Handle specific notification click based on type
+      switch (notification.type) {
+        case 'loan_request':
+        case 'loan_approval':
+        case 'loan_rejection':
+          navigate('/loans');
+          break;
+        case 'card_request':
+        case 'card_approval':
+        case 'card_rejection':
+          navigate('/cards');
+          break;
+        case 'transaction':
+          navigate('/statements');
+          break;
+        default:
+          navigate('/notifications');
+      }
+    }
+  };
+
+  return (
+    <div className="relative">
+      <NotificationBell 
+        onNotificationClick={() => setIsDropdownOpen(!isDropdownOpen)}
+        unreadCount={unreadCount}
+      />
+      <NotificationDropdown
+        isOpen={isDropdownOpen}
+        onClose={() => setIsDropdownOpen(false)}
+        notifications={notifications.slice(0, 5)} // Show only first 5 in dropdown
+        onMarkAsRead={markAsRead}
+        onMarkAllRead={markAllAsRead}
+        onNotificationClick={handleNotificationClick}
+      />
+    </div>
+  );
+}
+
 export default function Navbar() {
   const location = useLocation();
   const { user } = useAuth();
   
+  const navigationLinks = getNavigationLinks(user);
   const isActive = (path) => location.pathname === path;
 
   return (
@@ -234,15 +296,9 @@ export default function Navbar() {
           <div className="flex items-center justify-end gap-4">
             {user ? (
               <>
-                <Link
-                  to="/help"
-                  className={cn(
-                    buttonVariants({ variant: "outline", size: "icon" }),
-                    "hidden h-8 w-8 sm:flex"
-                  )}
-                >
-                  <BellIcon className="h-4 w-4" />
-                </Link>
+                <div className="hidden sm:flex">
+                  <NotificationComponent />
+                </div>
 
                 <Separator
                   orientation="vertical"
